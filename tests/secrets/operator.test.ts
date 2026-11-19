@@ -120,7 +120,13 @@ describe("operator command", () => {
     const shares = await initialise();
     await operator(["unseal"], shares[0]);
     await operator(["unseal"], shares[1]);
-    const wrong = Buffer.alloc(33, 9).toString("base64");
+    const used = new Set(
+      [shares[0]!, shares[1]!].map((share) => Buffer.from(share, "base64")[32]),
+    );
+    const unusedNumber = [...Array(255).keys()]
+      .map((n) => n + 1)
+      .find((n) => !used.has(n))!;
+    const wrong = Buffer.alloc(33, unusedNumber).toString("base64");
 
     const result = await operator(["unseal"], wrong);
 
