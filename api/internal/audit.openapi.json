@@ -1,0 +1,920 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Audit service (internal)",
+    "version": "1.0.0",
+    "description": "INTERNAL contract between the gateway, secrets and storage services and the audit service. Not public: it is only reachable on the internal Docker network. Each calling service has its own token, and may only record its own actions. The gateway reads a tenant's own events here for GET /v1/audit-events, so every error code must also exist in the public API. The audit service (services/audit/test/contract.test.ts) and its callers are tested against this file. See docs/decisions/0015-audit-and-monitoring.md."
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Liveness",
+        "responses": {
+          "200": {
+            "description": "Up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["ok"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "summary": "Readiness (the database)",
+        "responses": {
+          "200": {
+            "description": "Ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Readiness"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Readiness"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/events": {
+      "post": {
+        "summary": "Record one event at the end of its chain",
+        "description": "The audit service sets the ID, time, chain position, resource type (from the action) and hash. Unknown actions, unknown fields and actions of another service are refused.",
+        "parameters": [
+          {
+            "name": "X-Audit-Service",
+            "in": "header",
+            "required": true,
+            "description": "The calling service: gateway, secrets, storage, identity or flags",
+            "schema": {
+              "type": "string",
+              "enum": ["gateway", "secrets", "storage", "identity", "flags"]
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "description": "Bearer <that service's own audit token> (AUDIT_TOKEN in the service, AUDIT_TOKEN_<SERVICE> here). Compared in constant time.",
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer .{32,}$"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "description": "The caller's request ID, used in this service's logs",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewEvent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["id", "seq"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "seq": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: a field is missing, unknown or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: unknown service, wrong token, an action of another service, or not from the internal network",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: the event could not be saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "summary": "The gateway only: one tenant's events, newest first",
+        "description": "Never the platform chain: the tenant comes from X-Tenant-Id, set by the gateway from the verified API key.",
+        "parameters": [
+          {
+            "name": "X-Audit-Service",
+            "in": "header",
+            "required": true,
+            "description": "The calling service: gateway, secrets, storage, identity or flags",
+            "schema": {
+              "type": "string",
+              "enum": ["gateway", "secrets", "storage", "identity", "flags"]
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "description": "Bearer <that service's own audit token> (AUDIT_TOKEN in the service, AUDIT_TOKEN_<SERVICE> here). Compared in constant time.",
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer .{32,}$"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "description": "The caller's request ID, used in this service's logs",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "required": true,
+            "description": "Tenant verified by the gateway",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "Only events at or after this time",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,3})?(Z|[+-][0-9]{2}:[0-9]{2})$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "Only events before this time",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,3})?(Z|[+-][0-9]{2}:[0-9]{2})$"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "tenant.created",
+                "tenant.suspended",
+                "tenant.shredded",
+                "api_key.created",
+                "api_key.revoked",
+                "proxy_connection.created",
+                "proxy_connection.updated",
+                "proxy_connection.deleted",
+                "proxy_connection.used",
+                "proxy_connection.denied",
+                "secret.created",
+                "secret.read",
+                "secret.rotated",
+                "secret.deleted",
+                "secrets.initialised",
+                "secrets.unsealed",
+                "secrets.sealed",
+                "file.uploaded",
+                "file.downloaded",
+                "file.deleted",
+                "file.access_denied",
+                "user.signed_up",
+                "user.logged_in",
+                "user.login_failed",
+                "user.logged_out",
+                "user.password_changed",
+                "membership.added",
+                "membership.removed",
+                "user.profile_updated",
+                "user.session_revoked",
+                "user.deleted",
+                "user_pool.created",
+                "user_pool.updated",
+                "user_pool.deleted",
+                "pool_user.signed_up",
+                "pool_user.updated",
+                "pool_user.deleted",
+                "pool_user.password_reset",
+                "pool_user.password_changed",
+                "pool_user.logged_in",
+                "pool_user.login_failed",
+                "pool_user.logged_out",
+                "pool_user.token_reused",
+                "pool_role.created",
+                "pool_role.updated",
+                "pool_role.deleted",
+                "pool_user.role_added",
+                "pool_user.role_removed",
+                "feature_flag.created",
+                "feature_flag.updated",
+                "feature_flag.toggled",
+                "feature_flag.deleted",
+                "secret.revealed"
+              ]
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["success", "denied", "failure"]
+            }
+          },
+          {
+            "name": "resourceType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "api_key",
+                "feature_flag",
+                "file",
+                "membership",
+                "pool_user",
+                "pool_role",
+                "proxy_connection",
+                "secret",
+                "secrets_service",
+                "tenant",
+                "user",
+                "user_pool"
+              ]
+            }
+          },
+          {
+            "name": "resourceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "nextCursor from the previous page",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,15}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: invalid filter or X-Tenant-Id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: not the gateway, or a wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: the database is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/summary": {
+      "get": {
+        "summary": "The gateway only: counts of one tenant's events, for the dashboard's analytics",
+        "description": "Per UTC day, action and outcome, and calls per proxy connection, between two times (at most 200 days apart). Never the platform chain and never an event's details: only how many there were.",
+        "parameters": [
+          {
+            "name": "X-Audit-Service",
+            "in": "header",
+            "required": true,
+            "description": "The calling service: gateway, secrets, storage, identity or flags",
+            "schema": {
+              "type": "string",
+              "enum": ["gateway", "secrets", "storage", "identity", "flags"]
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "description": "Bearer <that service's own audit token> (AUDIT_TOKEN in the service, AUDIT_TOKEN_<SERVICE> here). Compared in constant time.",
+            "schema": {
+              "type": "string",
+              "pattern": "^Bearer .{32,}$"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "description": "The caller's request ID, used in this service's logs",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "required": true,
+            "description": "Tenant verified by the gateway",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "description": "Count events at or after this time",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,3})?(Z|[+-][0-9]{2}:[0-9]{2})$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "description": "Count events before this time",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,3})?(Z|[+-][0-9]{2}:[0-9]{2})$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: invalid times or X-Tenant-Id, or more than 200 days",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: not the gateway, or a wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: the database is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "NewEvent": {
+        "type": "object",
+        "required": ["action", "outcome", "actorType"],
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "tenant.created",
+              "tenant.suspended",
+              "tenant.shredded",
+              "api_key.created",
+              "api_key.revoked",
+              "proxy_connection.created",
+              "proxy_connection.updated",
+              "proxy_connection.deleted",
+              "proxy_connection.used",
+              "proxy_connection.denied",
+              "secret.created",
+              "secret.read",
+              "secret.rotated",
+              "secret.deleted",
+              "secrets.initialised",
+              "secrets.unsealed",
+              "secrets.sealed",
+              "file.uploaded",
+              "file.downloaded",
+              "file.deleted",
+              "file.access_denied",
+              "user.signed_up",
+              "user.logged_in",
+              "user.login_failed",
+              "user.logged_out",
+              "user.password_changed",
+              "membership.added",
+              "membership.removed",
+              "user.profile_updated",
+              "user.session_revoked",
+              "user.deleted",
+              "user_pool.created",
+              "user_pool.updated",
+              "user_pool.deleted",
+              "pool_user.signed_up",
+              "pool_user.updated",
+              "pool_user.deleted",
+              "pool_user.password_reset",
+              "pool_user.password_changed",
+              "pool_user.logged_in",
+              "pool_user.login_failed",
+              "pool_user.logged_out",
+              "pool_user.token_reused",
+              "pool_role.created",
+              "pool_role.updated",
+              "pool_role.deleted",
+              "pool_user.role_added",
+              "pool_user.role_removed",
+              "feature_flag.created",
+              "feature_flag.updated",
+              "feature_flag.toggled",
+              "feature_flag.deleted",
+              "secret.revealed"
+            ]
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["success", "denied", "failure"]
+          },
+          "actorType": {
+            "type": "string",
+            "enum": ["api_key", "user", "admin", "operator", "service"]
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Required for tenant actions (every action except secrets.* and file.access_denied; tenant.shredded names the deleted tenant but goes to the platform chain); user.login_failed without one goes to the platform chain"
+          },
+          "actorId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "e.g. the API key's ID (never the key)"
+          },
+          "resourceId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceIp": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F:.]{2,45}$",
+            "description": "The client's IP address, as the gateway saw it"
+          }
+        }
+      },
+      "Event": {
+        "type": "object",
+        "required": [
+          "id",
+          "occurredAt",
+          "actorType",
+          "actorId",
+          "action",
+          "resourceType",
+          "resourceId",
+          "outcome",
+          "requestId",
+          "sourceIp"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorType": {
+            "type": "string",
+            "enum": ["api_key", "user", "admin", "operator", "service"]
+          },
+          "actorId": {
+            "type": "string",
+            "nullable": true
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "tenant.created",
+              "tenant.suspended",
+              "tenant.shredded",
+              "api_key.created",
+              "api_key.revoked",
+              "proxy_connection.created",
+              "proxy_connection.updated",
+              "proxy_connection.deleted",
+              "proxy_connection.used",
+              "proxy_connection.denied",
+              "secret.created",
+              "secret.read",
+              "secret.rotated",
+              "secret.deleted",
+              "secrets.initialised",
+              "secrets.unsealed",
+              "secrets.sealed",
+              "file.uploaded",
+              "file.downloaded",
+              "file.deleted",
+              "file.access_denied",
+              "user.signed_up",
+              "user.logged_in",
+              "user.login_failed",
+              "user.logged_out",
+              "user.password_changed",
+              "membership.added",
+              "membership.removed",
+              "user.profile_updated",
+              "user.session_revoked",
+              "user.deleted",
+              "user_pool.created",
+              "user_pool.updated",
+              "user_pool.deleted",
+              "pool_user.signed_up",
+              "pool_user.updated",
+              "pool_user.deleted",
+              "pool_user.password_reset",
+              "pool_user.password_changed",
+              "pool_user.logged_in",
+              "pool_user.login_failed",
+              "pool_user.logged_out",
+              "pool_user.token_reused",
+              "pool_role.created",
+              "pool_role.updated",
+              "pool_role.deleted",
+              "pool_user.role_added",
+              "pool_user.role_removed",
+              "feature_flag.created",
+              "feature_flag.updated",
+              "feature_flag.toggled",
+              "feature_flag.deleted",
+              "secret.revealed"
+            ]
+          },
+          "resourceType": {
+            "type": "string",
+            "enum": [
+              "api_key",
+              "feature_flag",
+              "file",
+              "membership",
+              "pool_user",
+              "pool_role",
+              "proxy_connection",
+              "secret",
+              "secrets_service",
+              "tenant",
+              "user",
+              "user_pool"
+            ]
+          },
+          "resourceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["success", "denied", "failure"]
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "sourceIp": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventList": {
+        "type": "object",
+        "required": ["events", "nextCursor"],
+        "additionalProperties": false,
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Readiness": {
+        "type": "object",
+        "required": ["status", "checks"],
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["ready", "not_ready"]
+          },
+          "checks": {
+            "type": "object",
+            "required": ["postgres"],
+            "additionalProperties": false,
+            "properties": {
+              "postgres": {
+                "type": "string",
+                "enum": ["up", "down"]
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message", "requestId"],
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "BAD_REQUEST",
+                  "FORBIDDEN",
+                  "NOT_FOUND",
+                  "PAYLOAD_TOO_LARGE",
+                  "UNSUPPORTED_MEDIA_TYPE",
+                  "INTERNAL_ERROR",
+                  "SERVICE_UNAVAILABLE"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "requestId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        }
+      },
+      "EventSummary": {
+        "type": "object",
+        "required": ["daily", "connections"],
+        "additionalProperties": false,
+        "properties": {
+          "daily": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["day", "action", "outcome", "count"],
+              "additionalProperties": false,
+              "properties": {
+                "day": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+                  "description": "UTC day"
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "tenant.created",
+                    "tenant.suspended",
+                    "tenant.shredded",
+                    "api_key.created",
+                    "api_key.revoked",
+                    "proxy_connection.created",
+                    "proxy_connection.updated",
+                    "proxy_connection.deleted",
+                    "proxy_connection.used",
+                    "proxy_connection.denied",
+                    "secret.created",
+                    "secret.read",
+                    "secret.rotated",
+                    "secret.deleted",
+                    "secrets.initialised",
+                    "secrets.unsealed",
+                    "secrets.sealed",
+                    "file.uploaded",
+                    "file.downloaded",
+                    "file.deleted",
+                    "file.access_denied",
+                    "user.signed_up",
+                    "user.logged_in",
+                    "user.login_failed",
+                    "user.logged_out",
+                    "user.password_changed",
+                    "membership.added",
+                    "membership.removed",
+                    "user.profile_updated",
+                    "user.session_revoked",
+                    "user.deleted",
+                    "user_pool.created",
+                    "user_pool.updated",
+                    "user_pool.deleted",
+                    "pool_user.signed_up",
+                    "pool_user.updated",
+                    "pool_user.deleted",
+                    "pool_user.password_reset",
+                    "pool_user.password_changed",
+                    "pool_user.logged_in",
+                    "pool_user.login_failed",
+                    "pool_user.logged_out",
+                    "pool_user.token_reused",
+                    "pool_role.created",
+                    "pool_role.updated",
+                    "pool_role.deleted",
+                    "pool_user.role_added",
+                    "pool_user.role_removed",
+                    "feature_flag.created",
+                    "feature_flag.updated",
+                    "feature_flag.toggled",
+                    "feature_flag.deleted",
+                    "secret.revealed"
+                  ]
+                },
+                "outcome": {
+                  "type": "string",
+                  "enum": ["success", "denied", "failure"]
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "connections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["resourceId", "action", "outcome", "count"],
+              "additionalProperties": false,
+              "properties": {
+                "resourceId": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+                },
+                "action": {
+                  "type": "string",
+                  "enum": ["proxy_connection.used", "proxy_connection.denied"]
+                },
+                "outcome": {
+                  "type": "string",
+                  "enum": ["success", "denied", "failure"]
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

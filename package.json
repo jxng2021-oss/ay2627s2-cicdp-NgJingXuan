@@ -1,0 +1,22 @@
+{
+  "name": "secure-cloud-platform",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.9",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "build": "pnpm --filter @platform/secrets build",
+    "typecheck": "pnpm --filter @platform/secrets typecheck",
+    "test": "pnpm --filter @platform/secrets test",
+    "test:compat": "pnpm --filter @platform/secrets exec vitest run ../../tests/secrets/compatibility.test.ts",
+    "docker:build:secrets": "docker build --file services/secrets/Dockerfile --tag secure-cloud-platform/secrets:ci ."
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "typescript": "6.0.3"
+  }
+}
