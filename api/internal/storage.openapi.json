@@ -1,0 +1,1007 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Storage service (internal)",
+    "version": "2.0.0",
+    "description": "INTERNAL contract between the API gateway and the storage service. Not public: it is only reachable on the internal Docker network. Both services are tested against this file (services/gateway/test/contract.storage.test.ts and services/storage/test/contract.test.ts), so neither side can change it alone without failing CI. Storage's error bodies are passed straight through to clients, so its error codes must also exist in the public API. Every file is encrypted before it reaches the disk (docs/decisions/0014)."
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Liveness",
+        "responses": {
+          "200": {
+            "description": "Running",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["ok"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: not from the internal network",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: shutting down",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files": {
+      "post": {
+        "summary": "Encrypt the request body and store it as a new file for the tenant",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "required": true,
+            "description": "Tenant verified by the gateway from the API key",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "description": "The gateway's request ID, used in storage's logs and errors",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-File-Name",
+            "in": "header",
+            "required": false,
+            "description": "Original filename (percent-encoded UTF-8 allowed); kept in the database only",
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          },
+          {
+            "name": "X-Actor-Id",
+            "in": "header",
+            "required": false,
+            "description": "The verified API key's ID, set by the gateway, for the audit log only. Ignored unless a UUID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Actor-Type",
+            "in": "header",
+            "required": false,
+            "description": "Whose ID X-Actor-Id is: api_key (default) or user (a dashboard user). For the audit log only.",
+            "schema": {
+              "type": "string",
+              "enum": ["api_key", "user"]
+            }
+          },
+          {
+            "name": "X-Client-Ip",
+            "in": "header",
+            "required": false,
+            "description": "The client's IP address as the gateway saw it, for the audit log only. Ignored unless an IP address.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileMetadata"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: missing or invalid X-Tenant-Id, or invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: not from the internal network",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "PAYLOAD_TOO_LARGE: larger than MAX_UPLOAD_BYTES; STORAGE_QUOTA_EXCEEDED: over the tenant's storage limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: anything unexpected, including a file that fails its integrity check (never says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SECRETS_SEALED: the secrets service is sealed, so files can't be encrypted or decrypted; SERVICE_UNAVAILABLE: shutting down, or the secrets service can't be reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List the tenant's ready files (metadata only), newest first",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "required": true,
+            "description": "Tenant verified by the gateway from the API key",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "description": "The gateway's request ID, used in storage's logs and errors",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Actor-Id",
+            "in": "header",
+            "required": false,
+            "description": "The verified API key's ID, set by the gateway, for the audit log only. Ignored unless a UUID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Actor-Type",
+            "in": "header",
+            "required": false,
+            "description": "Whose ID X-Actor-Id is: api_key (default) or user (a dashboard user). For the audit log only.",
+            "schema": {
+              "type": "string",
+              "enum": ["api_key", "user"]
+            }
+          },
+          {
+            "name": "X-Client-Ip",
+            "in": "header",
+            "required": false,
+            "description": "The client's IP address as the gateway saw it, for the audit log only. Ignored unless an IP address.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: missing or invalid X-Tenant-Id, or invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: not from the internal network",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: anything unexpected, including a file that fails its integrity check (never says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: shutting down",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/{id}": {
+      "get": {
+        "summary": "Decrypt and return one of the tenant's files",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "File ID. Anything that isn't a ready file of this tenant (including malformed IDs) is 404."
+          },
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "required": true,
+            "description": "Tenant verified by the gateway from the API key",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "description": "The gateway's request ID, used in storage's logs and errors",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Actor-Id",
+            "in": "header",
+            "required": false,
+            "description": "The verified API key's ID, set by the gateway, for the audit log only. Ignored unless a UUID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Actor-Type",
+            "in": "header",
+            "required": false,
+            "description": "Whose ID X-Actor-Id is: api_key (default) or user (a dashboard user). For the audit log only.",
+            "schema": {
+              "type": "string",
+              "enum": ["api_key", "user"]
+            }
+          },
+          {
+            "name": "X-Client-Ip",
+            "in": "header",
+            "required": false,
+            "description": "The client's IP address as the gateway saw it, for the audit log only. Ignored unless an IP address.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file's plain bytes, as an attachment; each chunk is authenticated before it's sent, and the connection is cut if a later one fails",
+            "headers": {
+              "Content-Disposition": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "pattern": "^attachment; "
+                }
+              },
+              "X-Content-Type-Options": {
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "enum": ["nosniff"]
+                }
+              }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: missing or invalid X-Tenant-Id, or invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: not from the internal network",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: no such ready file for this tenant; another tenant's file is the same 404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: anything unexpected, including a file that fails its integrity check (never says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SECRETS_SEALED: the secrets service is sealed, so files can't be encrypted or decrypted; SERVICE_UNAVAILABLE: shutting down, or the secrets service can't be reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a file (safe to retry)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "File ID. Anything that isn't a ready file of this tenant (including malformed IDs) is 404."
+          },
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "required": true,
+            "description": "Tenant verified by the gateway from the API key",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "description": "The gateway's request ID, used in storage's logs and errors",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Actor-Id",
+            "in": "header",
+            "required": false,
+            "description": "The verified API key's ID, set by the gateway, for the audit log only. Ignored unless a UUID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Actor-Type",
+            "in": "header",
+            "required": false,
+            "description": "Whose ID X-Actor-Id is: api_key (default) or user (a dashboard user). For the audit log only.",
+            "schema": {
+              "type": "string",
+              "enum": ["api_key", "user"]
+            }
+          },
+          {
+            "name": "X-Client-Ip",
+            "in": "header",
+            "required": false,
+            "description": "The client's IP address as the gateway saw it, for the audit log only. Ignored unless an IP address.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "400": {
+            "description": "BAD_REQUEST: missing or invalid X-Tenant-Id, or invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: not from the internal network",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: no such ready file for this tenant; another tenant's file is the same 404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: anything unexpected, including a file that fails its integrity check (never says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: shutting down",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/{id}/metadata": {
+      "get": {
+        "summary": "One file's metadata",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "File ID. Anything that isn't a ready file of this tenant (including malformed IDs) is 404."
+          },
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "required": true,
+            "description": "Tenant verified by the gateway from the API key",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "description": "The gateway's request ID, used in storage's logs and errors",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Actor-Id",
+            "in": "header",
+            "required": false,
+            "description": "The verified API key's ID, set by the gateway, for the audit log only. Ignored unless a UUID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Actor-Type",
+            "in": "header",
+            "required": false,
+            "description": "Whose ID X-Actor-Id is: api_key (default) or user (a dashboard user). For the audit log only.",
+            "schema": {
+              "type": "string",
+              "enum": ["api_key", "user"]
+            }
+          },
+          {
+            "name": "X-Client-Ip",
+            "in": "header",
+            "required": false,
+            "description": "The client's IP address as the gateway saw it, for the audit log only. Ignored unless an IP address.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileMetadata"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: missing or invalid X-Tenant-Id, or invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: not from the internal network",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: no such ready file for this tenant; another tenant's file is the same 404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: anything unexpected, including a file that fails its integrity check (never says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: shutting down",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/usage": {
+      "get": {
+        "summary": "The tenant's storage used and its limit",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "required": true,
+            "description": "Tenant verified by the gateway from the API key",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "description": "The gateway's request ID, used in storage's logs and errors",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Actor-Id",
+            "in": "header",
+            "required": false,
+            "description": "The verified API key's ID, set by the gateway, for the audit log only. Ignored unless a UUID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Actor-Type",
+            "in": "header",
+            "required": false,
+            "description": "Whose ID X-Actor-Id is: api_key (default) or user (a dashboard user). For the audit log only.",
+            "schema": {
+              "type": "string",
+              "enum": ["api_key", "user"]
+            }
+          },
+          {
+            "name": "X-Client-Ip",
+            "in": "header",
+            "required": false,
+            "description": "The client's IP address as the gateway saw it, for the audit log only. Ignored unless an IP address.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: missing or invalid X-Tenant-Id, or invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: not from the internal network",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: anything unexpected, including a file that fails its integrity check (never says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: shutting down",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenant": {
+      "delete": {
+        "summary": "Delete every file of the tenant (gateway only, when a workspace is deleted)",
+        "description": "Crypto-shredding (docs/decisions/0020): marks every file of the tenant deleting and destroys its wrapped key, removes the encrypted data and the tenant's folder, then the records and usage. Called after the secrets service destroyed the tenant's key. Safe to call again. INTERNAL ONLY: no public gateway route maps to it.",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "required": true,
+            "description": "Tenant verified by the gateway from the API key",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "description": "The gateway's request ID, used in storage's logs and errors",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Actor-Id",
+            "in": "header",
+            "required": false,
+            "description": "The verified API key's ID, set by the gateway, for the audit log only. Ignored unless a UUID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Actor-Type",
+            "in": "header",
+            "required": false,
+            "description": "Whose ID X-Actor-Id is: api_key (default) or user (a dashboard user). For the audit log only.",
+            "schema": {
+              "type": "string",
+              "enum": ["api_key", "user"]
+            }
+          },
+          {
+            "name": "X-Client-Ip",
+            "in": "header",
+            "required": false,
+            "description": "The client's IP address as the gateway saw it, for the audit log only. Ignored unless an IP address.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "400": {
+            "description": "BAD_REQUEST: missing or invalid X-Tenant-Id, or invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: not from the internal network",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR: anything unexpected, including a file that fails its integrity check (never says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "FileMetadata": {
+        "type": "object",
+        "required": ["id", "name", "contentType", "size", "createdAt"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FileList": {
+        "type": "object",
+        "required": ["files", "nextCursor"],
+        "additionalProperties": false,
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileMetadata"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Usage": {
+        "type": "object",
+        "required": ["usedBytes", "reservedBytes", "limitBytes"],
+        "additionalProperties": false,
+        "properties": {
+          "usedBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reservedBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limitBytes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message", "requestId"],
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "BAD_REQUEST",
+                  "FORBIDDEN",
+                  "NOT_FOUND",
+                  "PAYLOAD_TOO_LARGE",
+                  "STORAGE_QUOTA_EXCEEDED",
+                  "SECRETS_SEALED",
+                  "INTERNAL_ERROR",
+                  "SERVICE_UNAVAILABLE"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "requestId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

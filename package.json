@@ -10,7 +10,7 @@
     "build": "pnpm --filter @platform/secrets build",
     "typecheck": "pnpm --filter @platform/secrets typecheck",
     "test": "pnpm --filter @platform/secrets test",
-    "test:compat": "pnpm --filter @platform/secrets exec vitest run ../../tests/secrets/compatibility.test.ts",
+    "test:compat": "pnpm --filter @platform/secrets exec vitest run ../../tests/secrets/compatibility.test.ts && cargo test --locked -p storage --test compatibility",
     "docker:build:secrets": "docker build --file services/secrets/Dockerfile --tag secure-cloud-platform/secrets:ci ."
   },
   "devDependencies": {
