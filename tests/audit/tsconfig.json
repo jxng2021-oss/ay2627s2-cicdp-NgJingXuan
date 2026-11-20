@@ -1,0 +1,4 @@
+{
+  "extends": "../../services/audit/tsconfig.json",
+  "include": ["."]
+}
