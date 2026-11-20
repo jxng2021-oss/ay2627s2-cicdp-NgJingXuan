@@ -22,7 +22,11 @@ import {
   UnsealFailedError,
   type SealSettings,
 } from "../../services/secrets/src/seal/seal-manager.js";
-import { InvalidShareError } from "../../services/secrets/src/seal/shares.js";
+import {
+  decodeShare,
+  InvalidShareError,
+  shareNumber,
+} from "../../services/secrets/src/seal/shares.js";
 import {
   call,
   captureLogs,
@@ -279,12 +283,14 @@ describe("unsealing", () => {
     await expect(unsealWith(manager, first.shares.slice(0, 3))).rejects.toThrow(
       UnsealFailedError,
     );
+    const usedNumbers = new Set(
+      second.shares.slice(0, 2).map((share) => shareNumber(decodeShare(share))),
+    );
+    const foreignShare = first.shares.find(
+      (share) => !usedNumbers.has(shareNumber(decodeShare(share))),
+    )!;
     await expect(
-      unsealWith(manager, [
-        second.shares[0]!,
-        second.shares[1]!,
-        first.shares[2]!,
-      ]),
+      unsealWith(manager, [second.shares[0]!, second.shares[1]!, foreignShare]),
     ).rejects.toThrow(UnsealFailedError);
     await unsealWith(manager, second.shares.slice(2, 5));
     expect(manager.state).toBe("unsealed");
