@@ -1,0 +1,18 @@
+{
+  "WARNING": "TEST-ONLY DATA. compatibility-v1.bin was encrypted with a FAKE file key (the text below) that protects nothing. Never use it anywhere else. Never edit or regenerate these files: they prove that files saved with format version 1 can still be decrypted by newer code. For a new format, add new fixture files next to these.",
+  "createdOn": "2026-11-05",
+  "fileKey": {
+    "text": "fake-test-file-key-not-a-secret!",
+    "base64": "ZmFrZS10ZXN0LWZpbGUta2V5LW5vdC1hLXNlY3JldCE="
+  },
+  "tenantId": "c0de0000-0000-4000-8000-00000000fa4e",
+  "fileId": "f11e0000-0000-4000-8000-00000000fa4e",
+  "formatVersion": 1,
+  "chunkSize": 64,
+  "chunkCount": 3,
+  "plainSize": 146,
+  "encryptedSize": 194,
+  "noncePrefix": "cc6a61892f2c8cda",
+  "checksum": "806790faee0b88e7261a4d1a75087c60c4bfc139f0897cd7b631e9960b757c3c",
+  "expectedContent": "TEST-ONLY sample file for the storage compatibility fixture.\nIt spans several 64-byte chunks, so chunk order and the final chunk are checked too.\n"
+}
