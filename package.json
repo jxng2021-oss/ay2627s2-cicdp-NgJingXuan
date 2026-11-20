@@ -7,19 +7,22 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "build": "pnpm build:secrets && pnpm build:storage",
+    "build": "pnpm build:secrets && pnpm build:audit && pnpm build:storage",
     "build:secrets": "pnpm --filter @platform/secrets build",
+    "build:audit": "pnpm --filter @platform/audit build",
     "build:storage": "cargo build --locked --release -p storage",
     "lint": "pnpm lint:storage",
     "lint:storage": "cargo fmt --all --check && cargo clippy --locked -p storage --all-targets -- -D warnings",
-    "typecheck": "pnpm --filter @platform/secrets typecheck",
-    "test": "pnpm test:secrets && pnpm test:storage",
+    "typecheck": "pnpm --filter @platform/secrets --filter @platform/audit typecheck",
+    "test": "pnpm test:secrets && pnpm test:audit && pnpm test:storage",
     "test:secrets": "pnpm --filter @platform/secrets test",
+    "test:audit": "pnpm --filter @platform/audit test",
     "test:storage": "cargo test --locked -p storage",
     "test:compat": "pnpm test:compat:secrets && pnpm test:compat:storage",
     "test:compat:secrets": "pnpm --filter @platform/secrets exec vitest run ../../tests/secrets/compatibility.test.ts",
     "test:compat:storage": "cargo test --locked -p storage --test compatibility",
     "docker:build:secrets": "docker build --file services/secrets/Dockerfile --tag secure-cloud-platform/secrets:ci .",
+    "docker:build:audit": "docker build --file services/audit/Dockerfile --tag secure-cloud-platform/audit:ci .",
     "docker:build:storage": "docker build --file services/storage/Dockerfile --tag secure-cloud-platform/storage:ci ."
   },
   "devDependencies": {
