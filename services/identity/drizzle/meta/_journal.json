@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1794805684450,
+      "tag": "0000_create_user_pools",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794833868636,
+      "tag": "0001_user_pool_roles",
+      "breakpoints": true
+    }
+  ]
+}

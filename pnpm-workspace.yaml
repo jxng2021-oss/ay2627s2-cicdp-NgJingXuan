@@ -3,6 +3,7 @@ packages:
   - services/audit
   - services/gateway
   - services/flags
+  - services/identity
   - tests
 
 injectWorkspacePackages: true
