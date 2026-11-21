@@ -20,7 +20,7 @@
     "build:storage": "cargo build --locked --release -p storage",
     "lint": "pnpm lint:storage",
     "lint:storage": "cargo fmt --all --check && cargo clippy --locked -p storage --all-targets -- -D warnings",
-    "typecheck": "pnpm --filter @platform/secrets --filter @platform/audit --filter @platform/gateway --filter @platform/flags --filter @platform/identity --filter @platform/dashboard --filter @secure-cloud/sdk --filter @platform/demo-shop typecheck && pnpm --filter @platform/tests exec tsc -p database",
+    "typecheck": "pnpm sdk:build && pnpm --filter @platform/secrets --filter @platform/audit --filter @platform/gateway --filter @platform/flags --filter @platform/identity --filter @platform/dashboard --filter @secure-cloud/sdk --filter @platform/demo-shop typecheck && pnpm --filter @platform/tests exec tsc -p database",
     "test": "pnpm test:secrets && pnpm test:audit && pnpm test:gateway && pnpm test:flags && pnpm test:identity && pnpm test:dashboard && pnpm test:sdk && pnpm test:demo-shop && pnpm test:storage",
     "test:secrets": "pnpm --filter @platform/secrets test",
     "test:audit": "pnpm --filter @platform/audit test",
