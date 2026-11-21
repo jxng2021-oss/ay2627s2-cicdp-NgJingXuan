@@ -228,6 +228,9 @@ export function AppNavbar({
               <li>
                 <Link href="/workspaces">Your workspaces</Link>
               </li>
+              <li>
+                <Link href="/docs">SDK docs</Link>
+              </li>
             </ul>
             <div className="dropdown-footer">
               <button type="button" onClick={() => void logOut()}>

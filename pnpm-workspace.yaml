@@ -5,6 +5,8 @@ packages:
   - services/flags
   - services/identity
   - apps/dashboard
+  - apps/demo-shop
+  - packages/sdk
   - tests
 
 injectWorkspacePackages: true

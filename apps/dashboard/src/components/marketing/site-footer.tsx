@@ -22,6 +22,7 @@ export function SiteFooter() {
           </nav>
           <nav aria-label="Help" className="body-6">
             <p className="caption-3 muted">Help</p>
+            <Link href="/docs">SDK docs</Link>
             <a href="/#faq">Questions</a>
           </nav>
           <nav aria-label="Account" className="body-6">
