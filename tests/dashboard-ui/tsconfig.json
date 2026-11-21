@@ -1,0 +1,4 @@
+{
+  "extends": "../../apps/dashboard/tsconfig.json",
+  "include": ["."]
+}
