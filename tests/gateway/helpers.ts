@@ -105,6 +105,8 @@ export class FakeAudit {
   );
 }
 
+export const AUDIT_TOKEN = "test-audit-token-gateway-0123456789abcdef";
+
 export async function startGateway(
   overrides: Partial<Omit<GatewayAppOptions, "rateLimits" | "audit">> & {
     db: Database;
@@ -115,6 +117,8 @@ export async function startGateway(
   const { rateLimits, audit = new FakeAudit(), ...rest } = overrides;
   const app = buildApp({
     audit: audit.client,
+    auditUrl: "http://127.0.0.1:1",
+    auditToken: AUDIT_TOKEN,
     adminApiEnabled: true,
     rateLimitStore: new MemoryRateLimitStore(),
     adminToken: ADMIN_TOKEN,
@@ -128,6 +132,7 @@ export async function startGateway(
     maxSecretBytes: 1024,
     server: TEST_SERVER_LIMITS,
     trustProxy: false,
+    proxy: { allowedHosts: [], allowPrivateTargets: false },
     ...rest,
     rateLimits: { ...TEST_RATE_LIMITS, ...rateLimits },
   });

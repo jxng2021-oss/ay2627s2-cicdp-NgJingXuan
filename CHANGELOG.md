@@ -8,6 +8,39 @@ adds things, and anything breaking would get a new version (`/v2/...`).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-21
+
+Proxy connections with secret injection, connection policies and the
+tenant audit log.
+
+### Added
+
+- Proxy connections: `PUT /v1/proxy-connections/{name}`,
+  `GET /v1/proxy-connections` and `DELETE /v1/proxy-connections/{name}`. A
+  connection holds an outside API's base URL and the **name** of the secret
+  to add, never its value. The base URL is checked against the SSRF rules
+  when it is saved.
+- The proxy route `ANY /v1/proxy/{connection}/{path}`: forwards the request
+  to the outside API with the secret's latest value added in the
+  connection's header, and never returns it. Only https, hosts from the
+  allowlist, and public addresses; redirects aren't followed.
+- An optional `policy` on a connection: `allowedRoutes` (methods and paths),
+  `rateLimit` (calls per window) and `amountLimit` (a whole number in a JSON
+  body field, per call and per UTC day). It is checked before the secret is
+  read, and a policy with limits fails closed (`503 SERVICE_UNAVAILABLE`)
+  if its counters can't be reached.
+- `GET /v1/proxy-connections/{name}/usage`: calls in the current window and
+  today's amount total.
+- Error codes for the proxy routes only: `PROXY_TARGET_BLOCKED` (403),
+  `PROXY_SECRET_MISSING` (409), `UPSTREAM_REDIRECT` (502),
+  `PROXY_POLICY_DENIED` (403) and `PROXY_RATE_LIMITED` (429, with
+  `Retry-After`).
+- `GET /v1/audit-events`: your tenant's own audit events, newest first,
+  filtered by `from`, `to`, `action`, `outcome`, `resourceType` and
+  `resourceId`, paginated with `limit` and `cursor`. Calls a policy refused
+  are recorded as `proxy_connection.denied`, never with their body or
+  amount.
+
 ## [1.0.0] - 2026-11-21
 
 The first release of the API gateway in this repository.

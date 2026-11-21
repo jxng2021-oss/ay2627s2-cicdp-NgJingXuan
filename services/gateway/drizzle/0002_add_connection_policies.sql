@@ -1,0 +1,1 @@
+ALTER TABLE "proxy_connections" ADD COLUMN "policy" jsonb;

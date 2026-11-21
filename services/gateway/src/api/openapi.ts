@@ -1,6 +1,6 @@
 import type { FastifyDynamicSwaggerOptions } from "@fastify/swagger";
 
-export const API_VERSION = "1.0.0";
+export const API_VERSION = "1.1.0";
 
 function onlyUnder(prefix: string, keep: boolean) {
   return ({ schema, url }: { schema: object; url: string }) => ({
@@ -33,6 +33,16 @@ export const openApiOptions: FastifyDynamicSwaggerOptions = {
         name: "Secrets",
         description:
           "Store encrypted secrets (passwords, tokens, keys) and read them back. Every save is a new version.",
+      },
+      {
+        name: "Proxy",
+        description:
+          "Call an outside API with one of your stored secrets added, without the secret ever reaching you.",
+      },
+      {
+        name: "Audit",
+        description:
+          "Your tamper-evident audit log: who did what to your keys, secrets, files and proxy connections, and when.",
       },
       { name: "Status", description: "Health and readiness" },
     ],

@@ -1,6 +1,13 @@
-import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, eq, getTableColumns, isNull, lt, or, sql } from "drizzle-orm";
 import type { Database } from "../db/client.js";
-import { apiKeys, tenants, type ApiKey, type Tenant } from "../db/schema.js";
+import {
+  apiKeys,
+  proxyConnections,
+  tenants,
+  type ApiKey,
+  type ProxyConnection,
+  type Tenant,
+} from "../db/schema.js";
 
 export function createTenant(db: Database, name: string): Promise<Tenant> {
   return db
@@ -97,4 +104,75 @@ function required<T>(row: T | undefined): T {
   if (row === undefined)
     throw new Error("Expected the database to return a row");
   return row;
+}
+
+export type ProxyConnectionSettings = Pick<
+  ProxyConnection,
+  "baseUrl" | "secretName" | "headerName" | "headerPrefix" | "policy"
+>;
+
+export async function saveProxyConnection(
+  db: Database,
+  tenantId: string,
+  name: string,
+  settings: ProxyConnectionSettings,
+): Promise<{ connection: ProxyConnection; created: boolean }> {
+  const [row] = await db
+    .insert(proxyConnections)
+    .values({ tenantId, name, ...settings })
+    .onConflictDoUpdate({
+      target: [proxyConnections.tenantId, proxyConnections.name],
+      set: { ...settings, updatedAt: sql`now()` },
+    })
+    .returning({
+      ...getTableColumns(proxyConnections),
+      created: sql<boolean>`(xmax = 0)`,
+    });
+  const { created, ...connection } = required(row);
+  return { connection, created };
+}
+
+export function listProxyConnections(
+  db: Database,
+  tenantId: string,
+): Promise<ProxyConnection[]> {
+  return db
+    .select()
+    .from(proxyConnections)
+    .where(eq(proxyConnections.tenantId, tenantId))
+    .orderBy(proxyConnections.name);
+}
+
+export async function findProxyConnection(
+  db: Database,
+  tenantId: string,
+  name: string,
+): Promise<ProxyConnection | undefined> {
+  const [row] = await db
+    .select()
+    .from(proxyConnections)
+    .where(
+      and(
+        eq(proxyConnections.tenantId, tenantId),
+        eq(proxyConnections.name, name),
+      ),
+    );
+  return row;
+}
+
+export async function deleteProxyConnection(
+  db: Database,
+  tenantId: string,
+  name: string,
+): Promise<boolean> {
+  const deleted = await db
+    .delete(proxyConnections)
+    .where(
+      and(
+        eq(proxyConnections.tenantId, tenantId),
+        eq(proxyConnections.name, name),
+      ),
+    )
+    .returning({ id: proxyConnections.id });
+  return deleted.length > 0;
 }

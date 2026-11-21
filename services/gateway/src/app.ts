@@ -18,6 +18,11 @@ import { rateLimitingDownWarning, type RateLimitSettings } from "./limits.js";
 import { loggerOptions, logRequests } from "./logging.js";
 import { RateLimiter, type RateLimitStore } from "./rate-limit.js";
 import { adminRoutes } from "./routes/admin.routes.js";
+import {
+  systemResolver,
+  type ProxyPolicy,
+  type Resolver,
+} from "./services/ssrf.service.js";
 import { publicApiV1 } from "./routes/public-api.routes.js";
 
 export interface ServerLimits {
@@ -45,7 +50,11 @@ export interface GatewayAppOptions {
   trustProxy: false | string[];
   apiDocsEnabled?: boolean;
   adminApiEnabled?: boolean;
+  proxy: ProxyPolicy;
+  resolver?: Resolver;
   audit: AuditClient;
+  auditUrl: string;
+  auditToken: string;
   version?: string;
   logger?: FastifyServerOptions["logger"];
 }
@@ -143,6 +152,7 @@ export function buildApp(options: GatewayAppOptions): FastifyInstance {
     routes.register(publicApiV1, {
       prefix: "/v1",
       ...options,
+      resolver: options.resolver ?? systemResolver,
       limiters: {
         perKey: limiter("key", rateLimits.requestsPerKey),
         uploadsPerKey: limiter("key-uploads", rateLimits.uploadsPerKey),

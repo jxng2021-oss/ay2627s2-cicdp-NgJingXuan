@@ -1,11 +1,12 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
+import type { ProxyErrorCode } from "./api/proxy-schemas.js";
 import type { ErrorCode } from "./api/schemas.js";
 import { AuditUnavailableError } from "./audit.js";
 
 export function sendError(
   reply: FastifyReply,
   statusCode: number,
-  code: ErrorCode | "CONFLICT",
+  code: ErrorCode | ProxyErrorCode | "CONFLICT",
   message: string,
 ) {
   return reply.code(statusCode).send({
@@ -16,7 +17,7 @@ export function sendError(
 export class AppError extends Error {
   constructor(
     readonly status: number,
-    readonly code: ErrorCode | "CONFLICT",
+    readonly code: ErrorCode | ProxyErrorCode | "CONFLICT",
     message: string,
   ) {
     super(message);
