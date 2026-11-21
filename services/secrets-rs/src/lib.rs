@@ -1,6 +1,14 @@
+pub mod app;
+pub mod audit;
+pub mod config;
+pub mod context;
+pub mod controllers;
 pub mod crypto;
 pub mod db;
+pub mod errors;
+pub mod input;
 pub mod keys;
+pub mod logging;
 pub mod models;
 pub mod operator;
 pub mod seal;

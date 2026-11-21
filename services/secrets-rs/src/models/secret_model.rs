@@ -226,11 +226,11 @@ pub async fn list_versions(
     conn: &mut PgConnection,
     secret_id: Uuid,
     limit: i64,
-    before_version: Option<i32>,
+    before_version: Option<i64>,
 ) -> Result<Vec<VersionSummary>, sqlx::Error> {
     sqlx::query_as(
         "SELECT version, created_at FROM secret_versions \
-         WHERE secret_id = $1 AND ($2::integer IS NULL OR version < $2) \
+         WHERE secret_id = $1 AND ($2::bigint IS NULL OR version < $2) \
          ORDER BY version DESC LIMIT $3",
     )
     .bind(secret_id)

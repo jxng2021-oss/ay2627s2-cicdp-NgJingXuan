@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+pub mod contract;
+pub mod http;
+
 use std::collections::HashMap;
 use std::sync::Mutex;
 

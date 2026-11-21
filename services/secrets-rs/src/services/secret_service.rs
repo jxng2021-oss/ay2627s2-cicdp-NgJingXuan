@@ -219,7 +219,7 @@ impl SecretService {
         tenant_id: Uuid,
         name: &str,
         limit: i64,
-        cursor: Option<i32>,
+        cursor: Option<i64>,
     ) -> Result<Option<Page<VersionSummary>>, ServiceError> {
         let mut conn = self.db.acquire().await?;
         let Some(secret) = model::find_secret(&mut conn, tenant_id, name).await? else {
