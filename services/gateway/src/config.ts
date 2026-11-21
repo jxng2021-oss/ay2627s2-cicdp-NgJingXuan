@@ -1,6 +1,7 @@
 import type { ServerLimits } from "./app.js";
 import { API_KEY_PREFIX_PATTERN } from "./services/api-key-tokens.service.js";
 import type { RateLimitSettings } from "./limits.js";
+import type { ProxyPolicy } from "./services/ssrf.service.js";
 
 export interface GatewayConfig {
   host: string;
@@ -20,6 +21,7 @@ export interface GatewayConfig {
   server: ServerLimits;
   trustProxy: false | string[];
   apiDocsEnabled: boolean;
+  proxy: ProxyPolicy;
   auditUrl: string;
   auditToken: string;
   auditTimeoutMs: number;
@@ -73,6 +75,7 @@ export function loadConfig(
     },
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
     apiDocsEnabled: env.API_DOCS_ENABLED === "true",
+    proxy: parseProxyPolicy(env),
     auditUrl: env.AUDIT_URL ?? "http://localhost:3003",
     auditToken: secret(env, "AUDIT_TOKEN"),
     auditTimeoutMs: number("AUDIT_TIMEOUT_MS", 2_000),
@@ -80,6 +83,27 @@ export function loadConfig(
     adminApiEnabled: parseAdminApiEnabled(env),
     shutdownTimeoutMs: number("SHUTDOWN_TIMEOUT_MS", 25_000),
   };
+}
+
+export function parseProxyPolicy(env: NodeJS.ProcessEnv): ProxyPolicy {
+  const allowedHosts = (env.PROXY_ALLOWED_HOSTS ?? "")
+    .split(",")
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean);
+  for (const host of allowedHosts) {
+    if (!/^[a-z0-9.-]+$/.test(host)) {
+      throw new Error(
+        `PROXY_ALLOWED_HOSTS must list plain host names (like api.example.com), not "${host}"`,
+      );
+    }
+  }
+  const allowPrivateTargets = env.PROXY_ALLOW_PRIVATE_TARGETS === "true";
+  if (allowPrivateTargets && env.NODE_ENV === "production") {
+    throw new Error(
+      "PROXY_ALLOW_PRIVATE_TARGETS=true is only for the local mock API and is refused when NODE_ENV=production",
+    );
+  }
+  return { allowedHosts, allowPrivateTargets };
 }
 
 export function parseAdminApiEnabled(env: NodeJS.ProcessEnv): boolean {

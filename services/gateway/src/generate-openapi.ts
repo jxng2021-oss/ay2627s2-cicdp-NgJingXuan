@@ -30,7 +30,10 @@ const app = buildApp({
     idleTimeoutMs: 1,
   },
   trustProxy: false,
+  proxy: { allowedHosts: [], allowPrivateTargets: false },
   audit: new AuditClient(() => Promise.resolve()),
+  auditUrl: "http://audit.invalid",
+  auditToken: "not-used-for-generating-the-specification",
 });
 
 await app.ready();
