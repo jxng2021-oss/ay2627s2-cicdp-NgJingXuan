@@ -118,6 +118,8 @@ export async function startGateway(
   const app = buildApp({
     audit: audit.client,
     auditUrl: "http://127.0.0.1:1",
+    identityUrl: "http://127.0.0.1:1",
+    flagsUrl: "http://127.0.0.1:1",
     auditToken: AUDIT_TOKEN,
     adminApiEnabled: true,
     rateLimitStore: new MemoryRateLimitStore(),
