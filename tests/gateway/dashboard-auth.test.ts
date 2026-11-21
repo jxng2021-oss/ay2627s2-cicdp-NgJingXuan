@@ -120,12 +120,19 @@ describe("sign-up and login", () => {
       await new Browser(app).login(email, "not-the-right-password");
       return performance.now() - started;
     };
+    const median = (values: number[]) =>
+      [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)]!;
     await time("warm-up@example.com");
+    await time("carol@example.com");
 
-    const known = await time("carol@example.com");
-    const unknown = await time("nobody@example.com");
+    const known: number[] = [];
+    const unknown: number[] = [];
+    for (let round = 0; round < 5; round++) {
+      known.push(await time("carol@example.com"));
+      unknown.push(await time("nobody@example.com"));
+    }
 
-    expect(unknown).toBeGreaterThan(known / 3);
+    expect(median(unknown)).toBeGreaterThan(median(known) / 3);
   });
 
   it("a new session for every login; logout and logout-all end sessions", async () => {
