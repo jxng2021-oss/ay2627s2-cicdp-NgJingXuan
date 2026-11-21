@@ -97,6 +97,14 @@ export class Upstream {
 }
 
 export function auditHeaders(request: FastifyRequest): Record<string, string> {
+  const userId = request.dashboardUserId;
+  if (userId) {
+    return {
+      "x-actor-id": userId,
+      "x-actor-type": "user",
+      "x-client-ip": request.ip,
+    };
+  }
   return {
     ...(request.apiKeyId ? { "x-actor-id": request.apiKeyId } : {}),
     "x-client-ip": request.ip,

@@ -3,12 +3,15 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const REPO = process.cwd();
-const SPEC = "api/openapi.v1.json";
+const DOCUMENTS = [
+  { file: "api/openapi.v1.json", kind: "public" },
+  { file: "api/openapi.dashboard.json", kind: "dashboard" },
+] as const;
 
-function generated(): string {
+function generated(kind: "public" | "dashboard"): string {
   const result = spawnSync(
     "node",
-    ["services/gateway/dist/generate-openapi.js"],
+    ["services/gateway/dist/generate-openapi.js", kind],
     {
       cwd: REPO,
       encoding: "utf8",
@@ -26,25 +29,32 @@ function generated(): string {
 }
 
 function generate(): void {
-  writeFileSync(join(REPO, SPEC), generated());
-  console.log(`Wrote ${SPEC}`);
+  for (const { file, kind } of DOCUMENTS) {
+    writeFileSync(join(REPO, file), generated(kind));
+    console.log(`Wrote ${file}`);
+  }
 }
 
 function check(): void {
-  let committed = "";
-  try {
-    committed = readFileSync(join(REPO, SPEC), "utf8").replace(/\r\n/g, "\n");
-  } catch {
-    committed = "";
+  let ok = true;
+  for (const { file, kind } of DOCUMENTS) {
+    let committed = "";
+    try {
+      committed = readFileSync(join(REPO, file), "utf8").replace(/\r\n/g, "\n");
+    } catch {
+      committed = "";
+    }
+    if (committed !== generated(kind)) {
+      console.error(
+        `✘ ${file} is out of date: the route schemas changed but the specification wasn't regenerated.\n` +
+          "  Run `pnpm api:generate` and commit the result.",
+      );
+      ok = false;
+    } else {
+      console.log(`✔ ${file} matches the code`);
+    }
   }
-  if (committed !== generated()) {
-    console.error(
-      `✘ ${SPEC} is out of date: the route schemas changed but the specification wasn't regenerated.\n` +
-        "  Run `pnpm api:generate` and commit the result.",
-    );
-    process.exit(1);
-  }
-  console.log(`✔ ${SPEC} matches the code`);
+  if (!ok) process.exit(1);
 }
 
 const commands: Record<string, () => void> = { generate, check };

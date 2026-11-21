@@ -6,16 +6,18 @@ const BASE = {
   REDIS_URL: "redis://x",
   API_KEY_HASH_SECRET: "h".repeat(32),
   AUDIT_TOKEN: "a".repeat(32),
+  SESSION_SECRET: "s".repeat(32),
 };
 
-describe("admin settings", () => {
-  it("are safe by default: admin API off", () => {
+describe("dashboard and admin settings", () => {
+  it("are safe by default: admin API off, Secure cookies", () => {
     const config = loadConfig(BASE);
 
     expect(config.adminApiEnabled).toBe(false);
+    expect(config.dashboard.session.cookieSecure).toBe(true);
   });
 
-  it("refuse the admin API when NODE_ENV=production", () => {
+  it("refuse the admin API and insecure cookies when NODE_ENV=production", () => {
     expect(() =>
       loadConfig({
         ...BASE,
@@ -24,9 +26,22 @@ describe("admin settings", () => {
         ADMIN_TOKEN: "t".repeat(32),
       }),
     ).toThrow(/ADMIN_API_ENABLED/);
+    expect(() =>
+      loadConfig({
+        ...BASE,
+        NODE_ENV: "production",
+        SESSION_COOKIE_SECURE: "false",
+      }),
+    ).toThrow(/SESSION_COOKIE_SECURE/);
   });
 
-  it("need an admin token when the admin API is on", () => {
+  it("need a session secret and a plain origin", () => {
+    expect(() => loadConfig({ ...BASE, SESSION_SECRET: "short" })).toThrow(
+      /SESSION_SECRET/,
+    );
+    expect(() =>
+      loadConfig({ ...BASE, DASHBOARD_ORIGIN: "https://dash.example.com/app" }),
+    ).toThrow(/DASHBOARD_ORIGIN/);
     expect(() => loadConfig({ ...BASE, ADMIN_API_ENABLED: "true" })).toThrow(
       /ADMIN_TOKEN/,
     );

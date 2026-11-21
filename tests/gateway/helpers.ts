@@ -48,7 +48,9 @@ export async function createTestDatabase(): Promise<{
     await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
     shared = { db, client };
   } else {
-    await shared.client.exec("truncate table api_keys, tenants cascade");
+    await shared.client.exec(
+      "truncate table sessions, memberships, users, api_keys, tenants cascade",
+    );
   }
   return shared;
 }
@@ -106,6 +108,7 @@ export class FakeAudit {
 }
 
 export const AUDIT_TOKEN = "test-audit-token-gateway-0123456789abcdef";
+export const SESSION_SECRET = "test-session-secret-0123456789abcdef0123";
 export const DASHBOARD_ORIGIN = "https://dashboard.test";
 
 export async function startGateway(
@@ -123,6 +126,18 @@ export async function startGateway(
     flagsUrl: "http://127.0.0.1:1",
     auditToken: AUDIT_TOKEN,
     adminApiEnabled: true,
+    dashboard: {
+      origin: DASHBOARD_ORIGIN,
+      session: {
+        secret: SESSION_SECRET,
+        accessTtlMs: 15 * 60_000,
+        idleTimeoutMs: 30 * 60_000,
+        absoluteTimeoutMs: 12 * 60 * 60_000,
+        refreshGraceMs: 30_000,
+        cookieSecure: true,
+      },
+      authLimits: { perIp: 1_000, perEmail: 1_000 },
+    },
     rateLimitStore: new MemoryRateLimitStore(),
     adminToken: ADMIN_TOKEN,
     apiKeyHashSecret: API_KEY_HASH_SECRET,

@@ -9,7 +9,11 @@ import Fastify, {
   type FastifyInstance,
   type FastifyServerOptions,
 } from "fastify";
-import { openApiOptions } from "./api/openapi.js";
+import { dashboardOpenApiOptions, openApiOptions } from "./api/openapi.js";
+import {
+  dashboardApi,
+  type DashboardSettings,
+} from "./routes/dashboard/index.js";
 import { healthSchema, readinessSchema } from "./api/schemas.js";
 import type { AuditClient } from "./audit.js";
 import type { Database } from "./db/client.js";
@@ -52,6 +56,8 @@ export interface GatewayAppOptions {
   server: ServerLimits;
   trustProxy: false | string[];
   apiDocsEnabled?: boolean;
+  openApiDocument?: "public" | "dashboard";
+  dashboard: DashboardSettings;
   adminApiEnabled?: boolean;
   proxy: ProxyPolicy;
   resolver?: Resolver;
@@ -114,7 +120,12 @@ export function buildApp(options: GatewayAppOptions): FastifyInstance {
     }
   });
 
-  app.register(swagger, openApiOptions);
+  app.register(
+    swagger,
+    options.openApiDocument === "dashboard"
+      ? dashboardOpenApiOptions
+      : openApiOptions,
+  );
   if (options.apiDocsEnabled) {
     app.register(swaggerUi, { routePrefix: "/docs" });
   }
@@ -151,6 +162,19 @@ export function buildApp(options: GatewayAppOptions): FastifyInstance {
         warnRateLimitingDown,
       });
     }
+
+    routes.register(dashboardApi, {
+      prefix: "/dashboard/v1",
+      ...options,
+      limiters: {
+        authPerIp: limiter("auth-ip", options.dashboard.authLimits.perIp),
+        authPerEmail: limiter(
+          "auth-email",
+          options.dashboard.authLimits.perEmail,
+        ),
+      },
+      warnRateLimitingDown,
+    });
 
     routes.register(userPoolKeysRoute, {
       prefix: "/v1",

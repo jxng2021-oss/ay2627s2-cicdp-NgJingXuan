@@ -1,9 +1,9 @@
-import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { beforeEach, describe, expect, it } from "vitest";
+import { insertMembership } from "../../services/gateway/src/models/membership.model.js";
 import type { Database } from "../../services/gateway/src/db/client.js";
 import { expectPublicContract } from "./contract-helpers.js";
-import { fakeIdentity } from "./dashboard-helpers.js";
+import { Browser, fakeIdentity } from "./dashboard-helpers.js";
 import {
   createTestDatabase,
   createTenantWithKey,
@@ -27,25 +27,29 @@ beforeEach(async () => {
 });
 
 async function workspaceWithPool() {
-  const { tenantId: workspace, key } = await createTenantWithKey(app, "Shop");
-  const created = await fetch(`${identity.url}/pools`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-tenant-id": workspace,
-      "x-request-id": randomUUID(),
-    },
-    body: JSON.stringify({ name: "Customers" }),
-  });
-  expect(created.status).toBe(201);
-  const { id: pool } = (await created.json()) as { id: string };
-  return { workspace, key, pool };
+  const owner = new Browser(app);
+  const workspace = await owner.signUp("owner@example.com", "Shop");
+  const created = await owner.request(
+    "POST",
+    owner.ws(workspace, "/user-pools"),
+    { body: { name: "Customers" } },
+  );
+  expect(created.statusCode).toBe(201);
+  return { owner, workspace, pool: created.json<{ id: string }>().id };
 }
 
 describe("/v1/user-pools (apps, with an API key)", () => {
   it("forwards only the validated fields, with the tenant from the key", async () => {
-    const { workspace, pool, key: apiKey } = await workspaceWithPool();
+    const { workspace, pool } = await workspaceWithPool();
     const { key } = await createTenantWithKey(app, "other");
+
+    const owner = new Browser(app);
+    await owner.login("owner@example.com");
+    const apiKey = (
+      await owner.request("POST", owner.ws(workspace, "/api-keys"), {
+        body: { name: "app" },
+      })
+    ).json<{ key: string }>().key;
 
     const signUp = await app.inject({
       method: "POST",
@@ -154,9 +158,92 @@ describe("/v1/user-pools (apps, with an API key)", () => {
   });
 });
 
+describe("user pools in the dashboard", () => {
+  it("owners create and delete pools and reset passwords; members only view", async () => {
+    const { owner, workspace, pool } = await workspaceWithPool();
+    const member = new Browser(app);
+    await member.signUp("member@example.com", "Member's own");
+    const me = await member.request("GET", "/dashboard/v1/auth/me");
+    await insertMembership(db, {
+      userId: me.json<{ user: { id: string } }>().user.id,
+      tenantId: workspace,
+      role: "member",
+    });
+    const user = "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b";
+
+    for (const path of [
+      "/user-pools",
+      `/user-pools/${pool}`,
+      `/user-pools/${pool}/users`,
+    ]) {
+      expect(
+        (await member.request("GET", member.ws(workspace, path))).statusCode,
+      ).toBe(200);
+    }
+    for (const [method, path, body] of [
+      ["POST", "/user-pools", { name: "Mine" }],
+      ["PATCH", `/user-pools/${pool}`, { name: "Renamed" }],
+      ["DELETE", `/user-pools/${pool}`, undefined],
+      ["PATCH", `/user-pools/${pool}/users/${user}`, { status: "disabled" }],
+      ["DELETE", `/user-pools/${pool}/users/${user}`, undefined],
+      ["POST", `/user-pools/${pool}/users/${user}/reset-password`, undefined],
+    ] as const) {
+      expectError(
+        await member.request(
+          method,
+          member.ws(workspace, path),
+          body ? { body } : {},
+        ),
+        403,
+        "FORBIDDEN",
+      );
+    }
+
+    const reset = await owner.request(
+      "POST",
+      owner.ws(workspace, `/user-pools/${pool}/users/${user}/reset-password`),
+    );
+    expect(reset.json()).toEqual({ temporaryPassword: "t".repeat(24) });
+    expect(
+      (
+        await owner.request(
+          "DELETE",
+          owner.ws(workspace, `/user-pools/${pool}`),
+        )
+      ).statusCode,
+    ).toBe(204);
+    expect(identity.problems).toEqual([]);
+  });
+
+  it("another workspace's member can't reach the pool (the same 404 as a missing workspace)", async () => {
+    const { workspace, pool } = await workspaceWithPool();
+    const stranger = new Browser(app);
+    await stranger.signUp("stranger@example.com", "Elsewhere");
+    expectError(
+      await stranger.request(
+        "GET",
+        stranger.ws(workspace, `/user-pools/${pool}`),
+      ),
+      404,
+      "NOT_FOUND",
+    );
+  });
+});
+
 describe("user pool roles (docs/decisions/0030)", () => {
+  async function appKey(workspace: string) {
+    const owner = new Browser(app);
+    await owner.login("owner@example.com");
+    return (
+      await owner.request("POST", owner.ws(workspace, "/api-keys"), {
+        body: { name: "app" },
+      })
+    ).json<{ key: string }>().key;
+  }
+
   it("an app manages roles and gives them to users, with only valid values forwarded", async () => {
-    const { workspace, pool, key } = await workspaceWithPool();
+    const { workspace, pool } = await workspaceWithPool();
+    const key = await appKey(workspace);
     const v1 = (
       method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
       path: string,
@@ -214,7 +301,8 @@ describe("user pool roles (docs/decisions/0030)", () => {
   });
 
   it("refuses bad names, permissions and fields before the identity service", async () => {
-    const { pool, key } = await workspaceWithPool();
+    const { workspace, pool } = await workspaceWithPool();
+    const key = await appKey(workspace);
     const before = identity.requests.length;
     const post = (payload: object) =>
       app.inject({
@@ -244,5 +332,62 @@ describe("user pool roles (docs/decisions/0030)", () => {
       "BAD_REQUEST",
     );
     expect(identity.requests.length).toBe(before);
+  });
+
+  it("in the dashboard, owners change roles; members only view", async () => {
+    const { owner, workspace, pool } = await workspaceWithPool();
+    const created = await owner.request(
+      "POST",
+      owner.ws(workspace, `/user-pools/${pool}/roles`),
+      {
+        body: { name: "editor", permissions: ["posts:write"] },
+      },
+    );
+    expect(created.statusCode).toBe(201);
+    const given = await owner.request(
+      "PUT",
+      owner.ws(
+        workspace,
+        `/user-pools/${pool}/users/${identity.user.id}/roles/editor`,
+      ),
+    );
+    expect(given.json()).toMatchObject({ roles: ["editor"] });
+
+    const member = new Browser(app);
+    await member.signUp("member@example.com", "Member's own");
+    const me = await member.request("GET", "/dashboard/v1/auth/me");
+    await insertMembership(db, {
+      userId: me.json<{ user: { id: string } }>().user.id,
+      tenantId: workspace,
+      role: "member",
+    });
+    expect(
+      (
+        await member.request(
+          "GET",
+          member.ws(workspace, `/user-pools/${pool}/roles`),
+        )
+      ).statusCode,
+    ).toBe(200);
+    for (const [method, path, body] of [
+      ["POST", `/user-pools/${pool}/roles`, { name: "x", permissions: [] }],
+      ["PATCH", `/user-pools/${pool}/roles/editor`, { permissions: [] }],
+      ["DELETE", `/user-pools/${pool}/roles/editor`, undefined],
+      [
+        "DELETE",
+        `/user-pools/${pool}/users/${identity.user.id}/roles/editor`,
+        undefined,
+      ],
+    ] as const) {
+      expectError(
+        await member.request(
+          method,
+          member.ws(workspace, path),
+          body ? { body } : {},
+        ),
+        403,
+        "FORBIDDEN",
+      );
+    }
   });
 });
