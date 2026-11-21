@@ -14,6 +14,12 @@ export const secretsContract = new Contract(
 export const auditContract = new Contract(
   loadSpec("api/internal/audit.openapi.json"),
 );
+export const identityContract = new Contract(
+  loadSpec("api/internal/identity.openapi.json"),
+);
+export const flagsContract = new Contract(
+  loadSpec("api/internal/flags.openapi.json"),
+);
 
 export function expectPublicContract(
   method: string,
