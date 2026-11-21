@@ -4,6 +4,7 @@ packages:
   - services/gateway
   - services/flags
   - services/identity
+  - apps/dashboard
   - tests
 
 injectWorkspacePackages: true
