@@ -30,7 +30,11 @@ describe("database migrations", () => {
 
     await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
 
-    expect(await tableNames()).toEqual(["api_keys", "tenants"]);
+    expect(await tableNames()).toEqual([
+      "api_keys",
+      "proxy_connections",
+      "tenants",
+    ]);
   });
 
   it("run again on an existing database without changing its data", async () => {

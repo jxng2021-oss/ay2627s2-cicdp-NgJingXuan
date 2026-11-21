@@ -8,6 +8,20 @@
       "when": 1793758723230,
       "tag": "0000_create_tenants_and_api_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793841432387,
+      "tag": "0001_add_proxy_connections",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795249653147,
+      "tag": "0002_add_connection_policies",
+      "breakpoints": true
     }
   ]
 }

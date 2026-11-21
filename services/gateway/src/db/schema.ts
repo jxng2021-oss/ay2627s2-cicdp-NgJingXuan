@@ -1,11 +1,14 @@
 import {
   index,
+  jsonb,
   pgEnum,
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { ConnectionPolicy } from "../services/policy.service.js";
 
 export const tenantStatus = pgEnum("tenant_status", ["active", "suspended"]);
 export const apiKeyStatus = pgEnum("api_key_status", ["active", "revoked"]);
@@ -44,5 +47,26 @@ export const apiKeys = pgTable(
   (table) => [index("api_keys_tenant_id_idx").on(table.tenantId)],
 );
 
+export const proxyConnections = pgTable(
+  "proxy_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    baseUrl: text("base_url").notNull(),
+    secretName: text("secret_name").notNull(),
+    headerName: text("header_name").notNull(),
+    headerPrefix: text("header_prefix").notNull().default(""),
+    policy: jsonb("policy").$type<ConnectionPolicy>(),
+    ...timestamps,
+  },
+  (table) => [
+    unique("proxy_connections_tenant_name").on(table.tenantId, table.name),
+  ],
+);
+
 export type Tenant = typeof tenants.$inferSelect;
+export type ProxyConnection = typeof proxyConnections.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
