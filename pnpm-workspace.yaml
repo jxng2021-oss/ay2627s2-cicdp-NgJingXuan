@@ -1,6 +1,7 @@
 packages:
   - services/secrets
   - services/audit
+  - services/gateway
   - tests
 
 injectWorkspacePackages: true
