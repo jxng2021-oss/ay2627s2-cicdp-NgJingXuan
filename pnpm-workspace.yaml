@@ -7,6 +7,8 @@ packages:
   - apps/dashboard
   - apps/demo-shop
   - packages/sdk
+  - tools/mock-upstream
   - tests
+  - tests/e2e
 
 injectWorkspacePackages: true
