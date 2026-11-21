@@ -1,0 +1,20 @@
+# Gitleaks settings, used by `pnpm scan:secrets` (scripts/security-scan.ts).
+# Every built-in rule stays on. Every exception below needs a written reason
+# and must be as narrow as possible (CLAUDE.md, "Every scanner ignore needs a
+# written reason").
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = """
+Secrets compatibility fixture. It holds TEST-ONLY ciphertext, nonces and auth
+tags, encrypted with a FAKE master key that is written out in the file itself
+("fake-test-master-key-not-secret!"), so nothing in it protects anything real.
+Its random-looking hex values trip the generic-api-key rule. CI decrypts this
+file to prove that existing secrets stay readable (pnpm test:compat), so it
+must be committed as is. Only this one file, and only that one rule: any
+other kind of secret in it would still be reported.
+"""
+targetRules = ["generic-api-key"]
+paths = ['''^tests/secrets/fixtures/compatibility-v1\.json$''']

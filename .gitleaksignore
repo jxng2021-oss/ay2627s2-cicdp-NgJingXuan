@@ -1,0 +1,10 @@
+# Reviewed Gitleaks false positives, one fingerprint each (commit:file:rule:line).
+# Every line needs a written reason (CLAUDE.md, "Every scanner ignore needs a
+# written reason").
+#
+# The SDK tests' made-up API key, sent only to the tests' own local mock
+# server. It started with "sk_test_", which matches Stripe's key format, but it
+# was never a Stripe key or a platform key. The value was changed to
+# "sk_local_fake-key-for-the-sdk-tests-only" afterwards; this commit is already
+# on main, so only its one finding is ignored here.
+8a550d873acf1951866f263de812bb951de62909:tests/sdk/helpers.ts:stripe-access-token:65
