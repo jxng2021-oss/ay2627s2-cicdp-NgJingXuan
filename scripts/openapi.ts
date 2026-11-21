@@ -7,6 +7,7 @@ const SPEC = "api/openapi.v1.json";
 const DASHBOARD_SPEC = "api/openapi.dashboard.json";
 const TYPES = [
   { spec: DASHBOARD_SPEC, output: "apps/dashboard/src/lib/api/schema.d.ts" },
+  { spec: SPEC, output: "apps/demo-shop/src/lib/platform/schema.d.ts" },
 ] as const;
 const DOCUMENTS = [
   { file: SPEC, kind: "public" },
