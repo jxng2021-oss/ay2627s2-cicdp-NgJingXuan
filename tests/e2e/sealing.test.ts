@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 import {
@@ -274,8 +275,12 @@ describe("operator commands are only reachable inside the secrets container", ()
         signal: AbortSignal.timeout(3000),
       }),
     ).rejects.toThrow();
-    const port = await dockerCompose(["port", "secrets", "3002"]);
-    expect(port.stdout.trim()).toMatch(/^(:0)?$/);
+    const container = await dockerCompose(["ps", "--quiet", "secrets"]);
+    const id = container.stdout.trim();
+    expect(id).not.toBe("");
+    const published = spawnSync("docker", ["port", id], { encoding: "utf8" });
+    expect(published.status).toBe(0);
+    expect(published.stdout.trim()).toBe("");
   });
 });
 
