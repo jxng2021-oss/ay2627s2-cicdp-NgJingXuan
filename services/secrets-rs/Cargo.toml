@@ -20,6 +20,14 @@ path = "../../tests/secrets-rs/compatibility.rs"
 name = "secrets"
 path = "../../tests/secrets-rs/secrets.rs"
 
+[[test]]
+name = "shamir"
+path = "../../tests/secrets-rs/shamir.rs"
+
+[[test]]
+name = "seal"
+path = "../../tests/secrets-rs/seal.rs"
+
 [dependencies]
 aes-gcm = { version = "=0.10.3", features = ["zeroize"] }
 base64 = "=0.22.1"
