@@ -1,4 +1,6 @@
 import type { ServerLimits } from "./app.js";
+import type { DashboardSettings } from "./routes/dashboard/index.js";
+import { DEFAULT_REFRESH_GRACE_MS } from "./services/session.service.js";
 import { API_KEY_PREFIX_PATTERN } from "./services/api-key-tokens.service.js";
 import type { RateLimitSettings } from "./limits.js";
 import type { ProxyPolicy } from "./services/ssrf.service.js";
@@ -28,6 +30,7 @@ export interface GatewayConfig {
   auditToken: string;
   auditTimeoutMs: number;
   version: string;
+  dashboard: DashboardSettings;
   adminApiEnabled: boolean;
   shutdownTimeoutMs: number;
 }
@@ -84,6 +87,7 @@ export function loadConfig(
     auditToken: secret(env, "AUDIT_TOKEN"),
     auditTimeoutMs: number("AUDIT_TIMEOUT_MS", 2_000),
     version: env.SERVICE_VERSION ?? "dev",
+    dashboard: parseDashboard(env, number),
     adminApiEnabled: parseAdminApiEnabled(env),
     shutdownTimeoutMs: number("SHUTDOWN_TIMEOUT_MS", 25_000),
   };
@@ -108,6 +112,53 @@ export function parseProxyPolicy(env: NodeJS.ProcessEnv): ProxyPolicy {
     );
   }
   return { allowedHosts, allowPrivateTargets };
+}
+
+export function parseDashboard(
+  env: NodeJS.ProcessEnv,
+  number: (name: string, fallback: number) => number,
+): DashboardSettings {
+  const origin = env.DASHBOARD_ORIGIN ?? "http://localhost:3000";
+  let parsed: URL;
+  try {
+    parsed = new URL(origin);
+  } catch {
+    throw new Error(
+      "DASHBOARD_ORIGIN must be an origin like https://dashboard.example.com",
+    );
+  }
+  if (
+    parsed.origin !== origin ||
+    !["http:", "https:"].includes(parsed.protocol)
+  ) {
+    throw new Error(
+      "DASHBOARD_ORIGIN must be an origin like https://dashboard.example.com (no path or trailing slash)",
+    );
+  }
+  const cookieSecure = env.SESSION_COOKIE_SECURE !== "false";
+  if (!cookieSecure && env.NODE_ENV === "production") {
+    throw new Error(
+      "SESSION_COOKIE_SECURE=false is only for local development and is refused when NODE_ENV=production",
+    );
+  }
+  return {
+    origin,
+    session: {
+      secret: secret(env, "SESSION_SECRET"),
+      accessTtlMs: number("SESSION_ACCESS_TTL_MS", 15 * 60_000),
+      idleTimeoutMs: number("SESSION_IDLE_TIMEOUT_MS", 30 * 60_000),
+      refreshGraceMs: DEFAULT_REFRESH_GRACE_MS,
+      absoluteTimeoutMs: number(
+        "SESSION_ABSOLUTE_TIMEOUT_MS",
+        12 * 60 * 60_000,
+      ),
+      cookieSecure,
+    },
+    authLimits: {
+      perIp: number("RATE_LIMIT_AUTH_PER_IP", 10),
+      perEmail: number("RATE_LIMIT_AUTH_PER_EMAIL", 5),
+    },
+  };
 }
 
 export function parseAdminApiEnabled(env: NodeJS.ProcessEnv): boolean {

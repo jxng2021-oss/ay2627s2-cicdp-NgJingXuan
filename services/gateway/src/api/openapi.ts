@@ -1,6 +1,7 @@
 import type { FastifyDynamicSwaggerOptions } from "@fastify/swagger";
 
 export const API_VERSION = "1.2.0";
+export const DASHBOARD_API_VERSION = "0.1.0";
 
 function onlyUnder(prefix: string, keep: boolean) {
   return ({ schema, url }: { schema: object; url: string }) => ({
@@ -59,6 +60,59 @@ export const openApiOptions: FastifyDynamicSwaggerOptions = {
   },
   hideUntagged: true,
   transform: onlyUnder("/dashboard/", false),
+  transformObject: (documentObject) =>
+    "openapiObject" in documentObject
+      ? markRequiredHeaders(documentObject.openapiObject)
+      : documentObject.swaggerObject,
+};
+
+export const dashboardOpenApiOptions: FastifyDynamicSwaggerOptions = {
+  openapi: {
+    openapi: "3.0.3",
+    info: {
+      title: "Secure Cloud Platform dashboard API (internal to the dashboard)",
+      version: DASHBOARD_API_VERSION,
+      description: [
+        "For the dashboard frontend only; it may change with it. Apps use the public API with API keys.",
+        "",
+        "- **Sessions:** sign up or log in; the session is an HttpOnly cookie, sent by the browser",
+        '  (`credentials: "include"`). API keys don\'t work here.',
+        "- **CSRF:** every POST, PUT and DELETE needs the dashboard's `Origin` and, once signed in,",
+        "  the token from `GET /dashboard/v1/auth/csrf` in `X-CSRF-Token`.",
+        "- **Roles:** owners manage API keys, secrets, connections and file deletion; members can view",
+        "  metadata and audit events, and upload and download files.",
+        '- **Errors:** `{ "error": { "code", "message", "requestId" } }`, as in the public API.',
+      ].join("\n"),
+    },
+    tags: [
+      { name: "Auth", description: "Accounts and sessions" },
+      { name: "Workspaces", description: "A workspace at a glance" },
+      { name: "API keys", description: "The workspace's API keys" },
+      {
+        name: "Secrets",
+        description: "Secrets: metadata, and values only through reveal",
+      },
+      { name: "Files", description: "Encrypted files" },
+      {
+        name: "Proxy connections",
+        description: "Connections for the proxy route",
+      },
+      { name: "Audit", description: "The workspace's audit log" },
+    ],
+    components: {
+      securitySchemes: {
+        session: {
+          type: "apiKey",
+          in: "cookie",
+          name: "__Secure-scp_session",
+          description:
+            "The session cookie set by sign-up and login (`scp_session` in local development).",
+        },
+      },
+    },
+  },
+  hideUntagged: true,
+  transform: onlyUnder("/dashboard/", true),
   transformObject: (documentObject) =>
     "openapiObject" in documentObject
       ? markRequiredHeaders(documentObject.openapiObject)

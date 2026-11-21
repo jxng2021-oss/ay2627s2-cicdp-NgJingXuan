@@ -3,7 +3,22 @@ import { AuditClient } from "./audit.js";
 import type { Database } from "./db/client.js";
 import { MemoryRateLimitStore } from "./rate-limit.js";
 
+const document = process.argv[2] === "dashboard" ? "dashboard" : "public";
+
 const app = buildApp({
+  openApiDocument: document,
+  dashboard: {
+    origin: "https://dashboard.invalid",
+    session: {
+      secret: "not-used-for-generating-the-specification",
+      accessTtlMs: 1,
+      idleTimeoutMs: 1,
+      absoluteTimeoutMs: 1,
+      refreshGraceMs: 1,
+      cookieSecure: true,
+    },
+    authLimits: { perIp: 1, perEmail: 1 },
+  },
   db: {} as Database,
   rateLimitStore: new MemoryRateLimitStore(),
   rateLimits: {
