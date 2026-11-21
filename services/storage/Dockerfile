@@ -4,6 +4,7 @@ WORKDIR /repo
 
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY services/storage/ services/storage/
+COPY services/secrets/ services/secrets/
 RUN cargo build --release --locked -p storage --bin storage
 
 FROM alpine:3.22

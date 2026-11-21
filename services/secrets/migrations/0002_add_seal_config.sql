@@ -1,4 +1,4 @@
-CREATE TABLE seal_config (
+CREATE TABLE IF NOT EXISTS seal_config (
     id smallint PRIMARY KEY DEFAULT 1 NOT NULL,
     seal_id uuid NOT NULL,
     share_count smallint NOT NULL,

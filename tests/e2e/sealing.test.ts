@@ -80,14 +80,14 @@ describe("sealed startup", () => {
     });
     expect(
       await nodeIn(
-        "secrets",
-        "fetch('http://127.0.0.1:3002/health').then(r=>console.log(r.status))",
+        "gateway",
+        "fetch('http://secrets:3002/health').then(r=>console.log(r.status))",
       ),
     ).toBe("200");
     const ready = JSON.parse(
       await nodeIn(
-        "secrets",
-        "fetch('http://127.0.0.1:3002/ready').then(async r=>console.log(JSON.stringify({s:r.status,b:await r.json()})))",
+        "gateway",
+        "fetch('http://secrets:3002/ready').then(async r=>console.log(JSON.stringify({s:r.status,b:await r.json()})))",
       ),
     ) as unknown;
     expect(ready).toEqual({
@@ -200,8 +200,7 @@ describe("sealed startup", () => {
       "exec",
       "-T",
       "secrets",
-      "node",
-      "dist/operator.js",
+      "secrets-operator",
       "unseal",
       shares[0]!,
     ]);

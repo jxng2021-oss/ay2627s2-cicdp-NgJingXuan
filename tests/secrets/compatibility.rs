@@ -195,7 +195,7 @@ async fn decrypts_every_stored_value_when_loaded_into_the_database(db: PgPool) {
 
 #[test]
 fn unwraps_file_and_signing_keys_wrapped_by_the_typescript_service() {
-    let fixture = read_fixture("secrets-rs/fixtures/wrapped-keys-v1.json");
+    let fixture = read_fixture("secrets/fixtures/wrapped-keys-v1.json");
     let tenant_id = text(&fixture, "tenantId");
     let tenant_key_bytes = STANDARD
         .decode(text(&fixture["tenantKey"], "base64"))

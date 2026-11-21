@@ -1,6 +1,12 @@
-CREATE TYPE tenant_key_status AS ENUM ('active', 'retired');
+DO $$
+BEGIN
+    CREATE TYPE tenant_key_status AS ENUM ('active', 'retired');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END
+$$;
 
-CREATE TABLE secrets (
+CREATE TABLE IF NOT EXISTS secrets (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
     tenant_id uuid NOT NULL,
     name text NOT NULL,
@@ -10,7 +16,7 @@ CREATE TABLE secrets (
     CONSTRAINT secrets_tenant_name UNIQUE (tenant_id, name)
 );
 
-CREATE TABLE secret_versions (
+CREATE TABLE IF NOT EXISTS secret_versions (
     secret_id uuid NOT NULL REFERENCES secrets (id) ON DELETE CASCADE,
     version integer NOT NULL,
     tenant_key_version integer NOT NULL,
@@ -22,7 +28,7 @@ CREATE TABLE secret_versions (
     CONSTRAINT secret_versions_secret_id_version_pk PRIMARY KEY (secret_id, version)
 );
 
-CREATE TABLE tenant_keys (
+CREATE TABLE IF NOT EXISTS tenant_keys (
     tenant_id uuid NOT NULL,
     key_version integer NOT NULL,
     status tenant_key_status DEFAULT 'active' NOT NULL,
@@ -35,4 +41,4 @@ CREATE TABLE tenant_keys (
     CONSTRAINT tenant_keys_tenant_id_key_version_pk PRIMARY KEY (tenant_id, key_version)
 );
 
-CREATE UNIQUE INDEX tenant_keys_one_active_per_tenant ON tenant_keys (tenant_id) WHERE status = 'active';
+CREATE UNIQUE INDEX IF NOT EXISTS tenant_keys_one_active_per_tenant ON tenant_keys (tenant_id) WHERE status = 'active';

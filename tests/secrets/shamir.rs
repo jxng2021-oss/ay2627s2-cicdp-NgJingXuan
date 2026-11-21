@@ -5,7 +5,7 @@ use serde_json::Value;
 
 fn fixture() -> Value {
     let path = format!(
-        "{}/../../tests/secrets-rs/fixtures/shamir-v1.json",
+        "{}/../../tests/secrets/fixtures/shamir-v1.json",
         env!("CARGO_MANIFEST_DIR")
     );
     serde_json::from_str(&std::fs::read_to_string(path).expect("readable")).expect("JSON")

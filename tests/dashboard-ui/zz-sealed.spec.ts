@@ -15,7 +15,7 @@ test("while sealed: a clear banner, and secret and file actions blocked; lists s
     page.getByRole("row", { name: /before-seal\.txt/ }),
   ).toBeVisible();
 
-  compose("exec", "-T", "secrets", "node", "dist/operator.js", "seal");
+  compose("exec", "-T", "secrets", "secrets-operator", "seal");
   await page.reload();
 
   const banner = page

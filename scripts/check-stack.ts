@@ -157,7 +157,7 @@ check(
     capDrop === '["ALL"]' &&
     (securityOpt ?? "").includes("no-new-privileges:true") &&
     (ulimits ?? "").includes('"Name":"core","Hard":0,"Soft":0') &&
-    user === '"node"',
+    user === '"secrets"',
   "the secrets container is read-only, drops all capabilities, has no core dumps and doesn't run as root",
   `the secrets container isn't hardened as expected: ${inspect.stdout.trim()}`,
 );

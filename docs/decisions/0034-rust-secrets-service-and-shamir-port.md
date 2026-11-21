@@ -16,7 +16,7 @@ The rewrite must not change anything outside the service:
 - everything encrypted by the TypeScript version must still decrypt: secret
   values and tenant keys (`tests/secrets/fixtures/compatibility-v1.json`),
   and the file keys and signing keys other services hold
-  (`tests/secrets-rs/fixtures/wrapped-keys-v1.json`, made by the TypeScript
+  (`tests/secrets/fixtures/wrapped-keys-v1.json`, made by the TypeScript
   code before the rewrite);
 - the tables stay the same, so the e2e tests' database checks still apply.
 
@@ -42,7 +42,7 @@ The TypeScript library the service already used, `shamir-secret-sharing`
 ## Decision
 
 **Port `shamir-secret-sharing` 0.0.4 to Rust line for line**
-(`services/secrets-rs/src/seal/shamir.rs`), and check the port against the
+(`services/secrets/src/seal/shamir.rs`), and check the port against the
 audited library in both directions.
 
 - The GF(2^8) log and exp tables (polynomial x⁸ + x⁴ + x³ + x + 1, generator
@@ -60,14 +60,14 @@ audited library in both directions.
 
 **Verification:**
 
-- `tests/secrets-rs/fixtures/shamir-v1.json` holds shares made by the audited
+- `tests/secrets/fixtures/shamir-v1.json` holds shares made by the audited
   library (2 to 255 shares, thresholds 2 to 7 and all-of-6). The Rust
   `combine` rebuilds every secret from every threshold-sized group tested.
 - Shares made by the Rust `split` were combined by the audited library: 240
   groups, all correct (a one-off check while writing this ADR; the fixture
   test keeps the combine direction checked in CI).
 - Round trips, fewer-than-threshold groups, share layout and argument errors
-  are tested in `tests/secrets-rs/shamir.rs`.
+  are tested in `tests/secrets/shamir.rs`.
 
 **Integrity**, which the library leaves to the caller: the combined unseal
 key decrypts the master key with AES-256-GCM, so a wrong or damaged share

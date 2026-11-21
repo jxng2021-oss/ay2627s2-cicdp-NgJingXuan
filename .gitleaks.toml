@@ -30,4 +30,4 @@ it to prove keys wrapped before the rewrite still work, so it must be committed
 as is. Only this one file, and only that one rule.
 """
 targetRules = ["generic-api-key"]
-paths = ['''^tests/secrets-rs/fixtures/wrapped-keys-v1\.json$''']
+paths = ['''^tests/secrets/fixtures/wrapped-keys-v1\.json$''']
