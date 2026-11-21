@@ -1,6 +1,6 @@
 import type { FastifyDynamicSwaggerOptions } from "@fastify/swagger";
 
-export const API_VERSION = "1.1.0";
+export const API_VERSION = "1.2.0";
 
 function onlyUnder(prefix: string, keep: boolean) {
   return ({ schema, url }: { schema: object; url: string }) => ({

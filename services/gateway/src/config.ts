@@ -13,6 +13,8 @@ export interface GatewayConfig {
   apiKeyPrefix: string;
   storageUrl: string;
   secretsUrl: string;
+  identityUrl: string;
+  flagsUrl: string;
   connectTimeoutMs: number;
   responseTimeoutMs: number;
   maxUploadBytes: number;
@@ -55,6 +57,8 @@ export function loadConfig(
     apiKeyPrefix,
     storageUrl: env.STORAGE_URL ?? "http://localhost:3001",
     secretsUrl: env.SECRETS_URL ?? "http://localhost:3002",
+    identityUrl: env.IDENTITY_URL ?? "http://localhost:3004",
+    flagsUrl: env.FLAGS_URL ?? "http://localhost:3005",
     connectTimeoutMs: number("UPSTREAM_CONNECT_TIMEOUT_MS", 5_000),
     responseTimeoutMs: number("UPSTREAM_RESPONSE_TIMEOUT_MS", 30_000),
     maxUploadBytes: number("MAX_UPLOAD_BYTES", 1024 * 1024 * 1024),

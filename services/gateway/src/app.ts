@@ -24,6 +24,7 @@ import {
   type Resolver,
 } from "./services/ssrf.service.js";
 import { publicApiV1 } from "./routes/public-api.routes.js";
+import { userPoolKeysRoute } from "./routes/user-pools.routes.js";
 
 export interface ServerLimits {
   maxHeaderBytes: number;
@@ -42,6 +43,8 @@ export interface GatewayAppOptions {
   apiKeyPrefix: string;
   storageUrl: string;
   secretsUrl: string;
+  identityUrl: string;
+  flagsUrl: string;
   connectTimeoutMs: number;
   responseTimeoutMs: number;
   maxUploadBytes: number;
@@ -148,6 +151,13 @@ export function buildApp(options: GatewayAppOptions): FastifyInstance {
         warnRateLimitingDown,
       });
     }
+
+    routes.register(userPoolKeysRoute, {
+      prefix: "/v1",
+      identityUrl: options.identityUrl,
+      connectTimeoutMs: options.connectTimeoutMs,
+      responseTimeoutMs: options.responseTimeoutMs,
+    });
 
     routes.register(publicApiV1, {
       prefix: "/v1",

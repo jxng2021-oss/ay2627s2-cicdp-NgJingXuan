@@ -8,6 +8,37 @@ adds things, and anything breaking would get a new version (`/v2/...`).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-21
+
+User pools (your app's own users), their roles, and feature flags. Only
+additions. Pools and flags are created and managed in the dashboard, which
+arrives with the dashboard API; these routes use them with your API key.
+
+### Added
+
+- **User pools**, from your server with your API key:
+  `POST /v1/user-pools/{poolId}/users` (sign up),
+  `GET /v1/user-pools/{poolId}/users/{userId}`,
+  `POST /v1/user-pools/{poolId}/users/{userId}/password`,
+  `POST /v1/user-pools/{poolId}/sessions` (sign in: an ES256 JWT access
+  token and a refresh token), `.../sessions/refresh` (each refresh token
+  works once) and `.../sessions/revoke` (sign out).
+- `GET /v1/user-pools/{poolId}/jwks.json`: a pool's public keys, **without
+  an API key**, to verify access tokens with any JWT library.
+- **Roles:** `GET` and `POST /v1/user-pools/{poolId}/roles`, and `GET`,
+  `PATCH` and `DELETE /v1/user-pools/{poolId}/roles/{role}`: each role is a
+  name with your app's own permissions (`orders:refund`; `orders:*` and `*`
+  as wildcards), at most 50 per pool.
+- `PUT` and `DELETE /v1/user-pools/{poolId}/users/{userId}/roles/{role}`:
+  give a user a role or take it away (safe to repeat; at most 20 per user).
+  `roles` on every user, and `roles` and `permissions` claims in access
+  tokens.
+- **Feature flags:** `POST /v1/flags/evaluate`: your flags' values for one
+  user in one environment, with the reason for each.
+- Audit events: the `user_pool.*`, `pool_user.*`, `pool_role.*` and
+  `feature_flag.*` actions, and the `user_pool`, `pool_user`, `pool_role`
+  and `feature_flag` resource types.
+
 ## [1.1.0] - 2026-11-21
 
 Proxy connections with secret injection, connection policies and the

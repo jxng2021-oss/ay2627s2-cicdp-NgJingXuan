@@ -106,6 +106,7 @@ export class FakeAudit {
 }
 
 export const AUDIT_TOKEN = "test-audit-token-gateway-0123456789abcdef";
+export const DASHBOARD_ORIGIN = "https://dashboard.test";
 
 export async function startGateway(
   overrides: Partial<Omit<GatewayAppOptions, "rateLimits" | "audit">> & {
@@ -118,6 +119,8 @@ export async function startGateway(
   const app = buildApp({
     audit: audit.client,
     auditUrl: "http://127.0.0.1:1",
+    identityUrl: "http://127.0.0.1:1",
+    flagsUrl: "http://127.0.0.1:1",
     auditToken: AUDIT_TOKEN,
     adminApiEnabled: true,
     rateLimitStore: new MemoryRateLimitStore(),

@@ -13,6 +13,8 @@ import type { SecretsProxyOptions } from "../services/secrets.service.js";
 import { secretsProxy } from "./secrets.routes.js";
 import type { StorageProxyOptions } from "../services/storage.service.js";
 import { storageProxy } from "./storage.routes.js";
+import { flagRoutes } from "./flags.routes.js";
+import { userPoolRoutes } from "./user-pools.routes.js";
 
 export type PublicApiOptions = ApiKeyAuthOptions &
   StorageProxyOptions &
@@ -22,6 +24,8 @@ export type PublicApiOptions = ApiKeyAuthOptions &
     audit: AuditClient;
     auditUrl: string;
     auditToken: string;
+    identityUrl: string;
+    flagsUrl: string;
     rateLimitStore: RateLimitStore;
   };
 
@@ -62,6 +66,11 @@ export const publicApiV1: FastifyPluginCallback<PublicApiOptions> = (
     audit: options.audit,
     rateLimitStore: options.rateLimitStore,
   });
+  app.register(userPoolRoutes, {
+    ...upstream,
+    identityUrl: options.identityUrl,
+  });
+  app.register(flagRoutes, { ...upstream, flagsUrl: options.flagsUrl });
   app.register(auditEventsRoute, {
     ...upstream,
     auditUrl: options.auditUrl,

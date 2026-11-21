@@ -33,6 +33,8 @@ const app = buildApp({
   proxy: { allowedHosts: [], allowPrivateTargets: false },
   audit: new AuditClient(() => Promise.resolve()),
   auditUrl: "http://audit.invalid",
+  identityUrl: "http://identity.invalid",
+  flagsUrl: "http://flags.invalid",
   auditToken: "not-used-for-generating-the-specification",
 });
 
