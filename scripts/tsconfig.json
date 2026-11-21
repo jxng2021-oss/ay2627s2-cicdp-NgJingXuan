@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // Scripts run directly with Node's built-in TypeScript support, which only
+    // strips types: imports must name the real .ts file, and only syntax that
+    // can simply be erased is allowed.
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true
+  },
+  "include": ["*.ts"]
+}

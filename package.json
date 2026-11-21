@@ -18,9 +18,11 @@
     "sdk:pack": "pnpm sdk:build && cd packages/sdk && pnpm pack --pack-destination ../../.local",
     "build:demo-shop": "pnpm sdk:build && pnpm --filter @platform/demo-shop build",
     "build:storage": "cargo build --locked --release -p storage",
-    "lint": "pnpm lint:storage",
+    "lint": "pnpm lint:ts && pnpm lint:storage",
+    "lint:ts": "pnpm sdk:build && eslint . && prettier --check .",
     "lint:storage": "cargo fmt --all --check && cargo clippy --locked -p storage --all-targets -- -D warnings",
-    "typecheck": "pnpm sdk:build && pnpm --filter @platform/secrets --filter @platform/audit --filter @platform/gateway --filter @platform/flags --filter @platform/identity --filter @platform/dashboard --filter @secure-cloud/sdk --filter @platform/demo-shop typecheck && pnpm --filter @platform/tests exec tsc -p database",
+    "format": "prettier --write .",
+    "typecheck": "pnpm sdk:build && tsc -p scripts && tsc -p api && pnpm --filter @platform/secrets --filter @platform/audit --filter @platform/gateway --filter @platform/flags --filter @platform/identity --filter @platform/dashboard --filter @secure-cloud/sdk --filter @platform/demo-shop typecheck && pnpm --filter @platform/tests exec tsc -p database",
     "test": "pnpm test:secrets && pnpm test:audit && pnpm test:gateway && pnpm test:flags && pnpm test:identity && pnpm test:dashboard && pnpm test:sdk && pnpm test:demo-shop && pnpm test:storage",
     "test:secrets": "pnpm --filter @platform/secrets test",
     "test:audit": "pnpm --filter @platform/audit test",
@@ -47,9 +49,15 @@
     "api:check": "pnpm --filter @platform/gateway build && node scripts/openapi.ts check"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@types/node": "22.20.5",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
-    "typescript": "6.0.3"
+    "eslint": "10.14.0",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "17.14.0",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1"
   }
 }
