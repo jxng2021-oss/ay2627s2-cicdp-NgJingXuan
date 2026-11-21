@@ -1,0 +1,657 @@
+# Local stack. Start everything with:  docker compose up --build
+#
+# Settings come from environment variables, with safe LOCAL-ONLY defaults so
+# the stack runs without any setup. To change them, copy .env.example to .env
+# (Compose reads it automatically). Never reuse these defaults outside your
+# machine: deploy/docker-compose.yml requires real values instead.
+
+# One Postgres server, six databases with separate logins (see
+# deploy/postgres-setup.sql): the gateway's "platform" database, the secrets
+# service's "secrets" database, the storage service's "storage" database
+# (file metadata), the audit service's "audit" database and the identity
+# service's "identity" database (user pools) and the flags service's "flags"
+# database (feature flags). No login can read another service's database.
+x-admin-database-url: &admin-database-url postgres://platform:${POSTGRES_PASSWORD:-local-only-postgres-password}@postgres:5432/platform
+x-gateway-database-url: &gateway-database-url postgres://gateway_app:${GATEWAY_DB_PASSWORD:-local-only-gateway-db-password}@postgres:5432/platform
+x-secrets-database-url: &secrets-database-url postgres://secrets_app:${SECRETS_DB_PASSWORD:-local-only-secrets-db-password}@postgres:5432/secrets
+x-storage-database-url: &storage-database-url postgres://storage_app:${STORAGE_DB_PASSWORD:-local-only-storage-db-password}@postgres:5432/storage
+x-identity-database-url: &identity-database-url postgres://identity_app:${IDENTITY_DB_PASSWORD:-local-only-identity-db-password}@postgres:5432/identity
+x-flags-database-url: &flags-database-url postgres://flags_app:${FLAGS_DB_PASSWORD:-local-only-flags-db-password}@postgres:5432/flags
+# Lets storage (and only storage) ask the secrets service to wrap and unwrap
+# file keys. Never sent to clients; the gateway doesn't have it.
+x-internal-service-token: &internal-service-token ${INTERNAL_SERVICE_TOKEN:-local-only-internal-service-token-do-not-use-elsewhere}
+# Lets the identity service (and only it) ask the secrets service to wrap
+# and unwrap user pools' signing data keys (docs/decisions/0025). A
+# different token from storage's, so neither can use the other's routes.
+x-identity-service-token: &identity-service-token ${IDENTITY_SERVICE_TOKEN:-local-only-identity-service-token-do-not-use-elsewhere}
+# The audit service: migrations as audit_migrator, the running service as
+# audit_app (insert and read only). docs/decisions/0015.
+x-audit-migrator-database-url: &audit-migrator-database-url postgres://audit_migrator:${AUDIT_MIGRATOR_DB_PASSWORD:-local-only-audit-migrator-db-password}@postgres:5432/audit
+x-audit-database-url: &audit-database-url postgres://audit_app:${AUDIT_DB_PASSWORD:-local-only-audit-db-password}@postgres:5432/audit
+# Each service's own token for sending audit events (the audit service has
+# all of them), and the key for the entries' HMACs.
+x-audit-token-gateway: &audit-token-gateway ${AUDIT_TOKEN_GATEWAY:-local-only-audit-token-gateway-do-not-use-elsewhere}
+x-audit-token-secrets: &audit-token-secrets ${AUDIT_TOKEN_SECRETS:-local-only-audit-token-secrets-do-not-use-elsewhere}
+x-audit-token-storage: &audit-token-storage ${AUDIT_TOKEN_STORAGE:-local-only-audit-token-storage-do-not-use-elsewhere}
+x-audit-token-identity: &audit-token-identity ${AUDIT_TOKEN_IDENTITY:-local-only-audit-token-identity-do-not-use-elsewhere}
+x-audit-token-flags: &audit-token-flags ${AUDIT_TOKEN_FLAGS:-local-only-audit-token-flags-do-not-use-elsewhere}
+x-redis-password: &redis-password ${REDIS_PASSWORD:-local-only-redis-password}
+x-max-upload-bytes: &max-upload-bytes ${MAX_UPLOAD_BYTES:-1073741824}
+x-max-secret-bytes: &max-secret-bytes ${MAX_SECRET_BYTES:-65536}
+
+services:
+  gateway:
+    # A fixed image name lets CI build the image once (with caching) and then
+    # start it with Compose without rebuilding.
+    image: secure-cloud-platform/gateway:dev
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    environment:
+      DATABASE_URL: *gateway-database-url
+      # The old /admin API: off by default (local tests turn it on in
+      # tests/e2e/e2e.env). Accounts sign up through the dashboard API.
+      ADMIN_API_ENABLED: ${ADMIN_API_ENABLED:-false}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-local-only-admin-token-do-not-use-elsewhere}
+      # The dashboard API (docs/decisions/0016). Local http, so the session
+      # cookie can't be Secure here; deployments always use Secure.
+      # The only origin allowed to use the dashboard API: the dashboard below.
+      DASHBOARD_ORIGIN: ${DASHBOARD_ORIGIN:-http://localhost:3000}
+      SESSION_SECRET: ${SESSION_SECRET:-local-only-session-secret-do-not-use-elsewhere}
+      SESSION_COOKIE_SECURE: "false"
+      SESSION_ACCESS_TTL_MS: ${SESSION_ACCESS_TTL_MS:-900000}
+      SESSION_IDLE_TIMEOUT_MS: ${SESSION_IDLE_TIMEOUT_MS:-1800000}
+      SESSION_ABSOLUTE_TIMEOUT_MS: ${SESSION_ABSOLUTE_TIMEOUT_MS:-43200000}
+      RATE_LIMIT_AUTH_PER_IP: ${RATE_LIMIT_AUTH_PER_IP:-10}
+      RATE_LIMIT_AUTH_PER_EMAIL: ${RATE_LIMIT_AUTH_PER_EMAIL:-5}
+      API_KEY_HASH_SECRET: ${API_KEY_HASH_SECRET:-local-only-api-key-hash-secret-do-not-use-elsewhere}
+      API_KEY_PREFIX: ${API_KEY_PREFIX:-sk_local_}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-local-only-redis-password}@redis:6379
+      STORAGE_URL: http://storage:3001
+      SECRETS_URL: http://secrets:3002
+      AUDIT_URL: http://audit:3003
+      AUDIT_TOKEN: *audit-token-gateway
+      # User pools (docs/decisions/0025) and feature flags (0026).
+      IDENTITY_URL: http://identity:3004
+      FLAGS_URL: http://flags:3005
+      SERVICE_VERSION: ${SERVICE_VERSION:-dev}
+      # Limits and timeouts (see .env.example). Tests use smaller values.
+      MAX_UPLOAD_BYTES: *max-upload-bytes
+      MAX_SECRET_BYTES: *max-secret-bytes
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+      RATE_LIMIT_REQUESTS_PER_KEY: ${RATE_LIMIT_REQUESTS_PER_KEY:-600}
+      RATE_LIMIT_UPLOADS_PER_KEY: ${RATE_LIMIT_UPLOADS_PER_KEY:-60}
+      RATE_LIMIT_FAILED_AUTH_PER_IP: ${RATE_LIMIT_FAILED_AUTH_PER_IP:-20}
+      RATE_LIMIT_ADMIN_PER_IP: ${RATE_LIMIT_ADMIN_PER_IP:-30}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      # Interactive API docs at /docs (off unless set to true)
+      API_DOCS_ENABLED: ${API_DOCS_ENABLED:-false}
+      # Proxy route (secret injection, docs/decisions/0013). Locally the only
+      # allowed target is the pretend outside API below, which is plain
+      # http:// on a private address: PROXY_ALLOW_PRIVATE_TARGETS allows that,
+      # and NODE_ENV=development is needed for it (the gateway refuses to
+      # start with it in production). Never use these settings on a server.
+      PROXY_ALLOWED_HOSTS: ${PROXY_ALLOWED_HOSTS:-mock-upstream}
+      PROXY_ALLOW_PRIVATE_TARGETS: ${PROXY_ALLOW_PRIVATE_TARGETS:-true}
+      NODE_ENV: development
+      MAX_HEADER_BYTES: 16384
+      HEADERS_TIMEOUT_MS: 10000
+      REQUEST_TIMEOUT_MS: 600000
+      KEEP_ALIVE_TIMEOUT_MS: 5000
+      IDLE_TIMEOUT_MS: 60000
+      UPSTREAM_CONNECT_TIMEOUT_MS: 5000
+      UPSTREAM_RESPONSE_TIMEOUT_MS: 30000
+      SHUTDOWN_TIMEOUT_MS: 25000
+    # The gateway is the only service published to the host, and only on this
+    # machine's loopback address: other devices on your network can't reach
+    # your local stack. (It also avoids `localhost` hanging on Docker Desktop
+    # when its IPv6 forwarding misbehaves: ::1 is simply refused and clients
+    # fall back to 127.0.0.1.)
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
+    networks:
+      - public
+      - internal
+    depends_on:
+      storage:
+        condition: service_healthy
+      secrets:
+        condition: service_healthy
+      audit:
+        condition: service_healthy
+      identity:
+        condition: service_healthy
+      flags:
+        condition: service_healthy
+      # The database must be fully migrated before the gateway starts.
+      migrate:
+        condition: service_completed_successfully
+      # Rate limit counters. The gateway still serves API requests if Redis
+      # goes down later (see docs/decisions/0009-gateway-protections.md).
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      # Check every second while starting up, so `docker compose up --wait`
+      # returns as soon as the service is ready instead of after 10s.
+      start_period: 15s
+      start_interval: 1s
+    restart: unless-stopped
+    # Time to finish requests in progress after "docker compose stop"
+    # (longer than SHUTDOWN_TIMEOUT_MS).
+    stop_grace_period: 30s
+
+  # Creates the database logins and the service databases, and sets who may
+  # connect where (deploy/postgres-setup.sql). Runs once per start, then exits.
+  db-setup:
+    image: postgres:18.6-alpine
+    user: "70:70"
+    command: ["psql", "--no-psqlrc", "--file=/setup/postgres-setup.sql"]
+    environment:
+      PGHOST: postgres
+      PGUSER: platform
+      PGDATABASE: platform
+      PGPASSWORD: ${POSTGRES_PASSWORD:-local-only-postgres-password}
+      GATEWAY_DB_PASSWORD: ${GATEWAY_DB_PASSWORD:-local-only-gateway-db-password}
+      SECRETS_DB_PASSWORD: ${SECRETS_DB_PASSWORD:-local-only-secrets-db-password}
+      STORAGE_DB_PASSWORD: ${STORAGE_DB_PASSWORD:-local-only-storage-db-password}
+      AUDIT_MIGRATOR_DB_PASSWORD: ${AUDIT_MIGRATOR_DB_PASSWORD:-local-only-audit-migrator-db-password}
+      AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD:-local-only-audit-db-password}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-local-only-identity-db-password}
+      FLAGS_DB_PASSWORD: ${FLAGS_DB_PASSWORD:-local-only-flags-db-password}
+    volumes:
+      - ./deploy/postgres-setup.sql:/setup/postgres-setup.sql:ro
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # Runs the gateway's database migrations once, then exits. Safe to run every
+  # time: migrations that already ran are skipped.
+  migrate:
+    # Same image as the gateway, which contains the migrations. It is built by
+    # the gateway service above, so never try to pull it from a registry.
+    image: secure-cloud-platform/gateway:dev
+    pull_policy: never
+    command: ["node", "dist/migrate.js"]
+    environment:
+      # The admin login: it owns the gateway's tables. The running gateway
+      # uses gateway_app, which can't change the schema.
+      DATABASE_URL: *admin-database-url
+    networks:
+      - internal
+    depends_on:
+      db-setup:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # The secrets service's own migrations, as its own login, in its own
+  # database.
+  secrets-migrate:
+    image: secure-cloud-platform/secrets:dev
+    pull_policy: never
+    command: ["node", "dist/migrate.js"]
+    environment:
+      DATABASE_URL: *secrets-database-url
+    networks:
+      - internal
+    depends_on:
+      db-setup:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # The storage service's own migrations, as its own login, in its own
+  # database.
+  storage-migrate:
+    image: secure-cloud-platform/storage:dev
+    pull_policy: never
+    command: ["migrate"]
+    environment:
+      DATABASE_URL: *storage-database-url
+    networks:
+      - internal
+    depends_on:
+      db-setup:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # The audit service's migrations, as the migration login (the running
+  # service's login can't change the schema).
+  audit-migrate:
+    image: secure-cloud-platform/audit:dev
+    pull_policy: never
+    command: ["node", "dist/migrate.js"]
+    environment:
+      DATABASE_URL: *audit-migrator-database-url
+    networks:
+      - internal
+    depends_on:
+      db-setup:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # Tamper-evident audit log (docs/decisions/0015-audit-and-monitoring.md).
+  # Internal network only, no port published. Verify a chain with:
+  #   docker compose exec audit node dist/verify.js --all
+  audit:
+    image: secure-cloud-platform/audit:dev
+    build:
+      context: .
+      dockerfile: services/audit/Dockerfile
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      DATABASE_URL: *audit-database-url
+      AUDIT_HMAC_KEY: ${AUDIT_HMAC_KEY:-local-only-audit-hmac-key-do-not-use-elsewhere}
+      AUDIT_TOKEN_GATEWAY: *audit-token-gateway
+      AUDIT_TOKEN_SECRETS: *audit-token-secrets
+      AUDIT_TOKEN_STORAGE: *audit-token-storage
+      AUDIT_TOKEN_IDENTITY: *audit-token-identity
+      AUDIT_TOKEN_FLAGS: *audit-token-flags
+      SERVICE_VERSION: ${SERVICE_VERSION:-dev}
+      SHUTDOWN_TIMEOUT_MS: 25000
+    networks:
+      - internal
+    depends_on:
+      audit-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3003/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+      start_interval: 1s
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  # The identity service's own migrations, as its own login, in its own
+  # database.
+  identity-migrate:
+    image: secure-cloud-platform/identity:dev
+    pull_policy: never
+    command: ["node", "dist/migrate.js"]
+    environment:
+      DATABASE_URL: *identity-database-url
+    networks:
+      - internal
+    depends_on:
+      db-setup:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # User pools: a workspace's own end users (docs/decisions/0025). Internal
+  # network only; apps reach it through the gateway's /v1/user-pools.
+  # Signing tokens needs the vault unsealed (each pool's key is wrapped by
+  # the secrets service).
+  identity:
+    image: secure-cloud-platform/identity:dev
+    build:
+      context: .
+      dockerfile: services/identity/Dockerfile
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      DATABASE_URL: *identity-database-url
+      SECRETS_URL: http://secrets:3002
+      IDENTITY_SERVICE_TOKEN: *identity-service-token
+      AUDIT_URL: http://audit:3003
+      AUDIT_TOKEN: *audit-token-identity
+      # The gateway's address as apps see it: the tokens' issuer and the
+      # JWKS address are built from it.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      SERVICE_VERSION: ${SERVICE_VERSION:-dev}
+      SHUTDOWN_TIMEOUT_MS: 25000
+    networks:
+      - internal
+    depends_on:
+      identity-migrate:
+        condition: service_completed_successfully
+      audit:
+        condition: service_healthy
+      secrets:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3004/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+      start_interval: 1s
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  # The flags service's own migrations, as its own login, in its own database.
+  flags-migrate:
+    image: secure-cloud-platform/flags:dev
+    pull_policy: never
+    command: ["node", "dist/migrate.js"]
+    environment:
+      DATABASE_URL: *flags-database-url
+    networks:
+      - internal
+    depends_on:
+      db-setup:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # Feature flags (docs/decisions/0026). Internal network only; apps reach
+  # it through the gateway's /v1/flags/evaluate.
+  flags:
+    image: secure-cloud-platform/flags:dev
+    build:
+      context: .
+      dockerfile: services/flags/Dockerfile
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      DATABASE_URL: *flags-database-url
+      AUDIT_URL: http://audit:3003
+      AUDIT_TOKEN: *audit-token-flags
+      SERVICE_VERSION: ${SERVICE_VERSION:-dev}
+      SHUTDOWN_TIMEOUT_MS: 25000
+    networks:
+      - internal
+    depends_on:
+      flags-migrate:
+        condition: service_completed_successfully
+      audit:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3005/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+      start_interval: 1s
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  # Encrypted secrets (docs/decisions/0011-secrets-encryption.md).
+  # Starts SEALED: after `pnpm local:start`, run
+  # `pnpm local:secrets:init` once, and `pnpm local:secrets:unseal` after
+  # every restart (README, "Secrets: first-time setup").
+  secrets:
+    image: secure-cloud-platform/secrets:dev
+    build:
+      context: .
+      dockerfile: services/secrets/Dockerfile
+    # Hardened: it holds the master key in memory while unsealed.
+    # Read-only filesystem; the only writable places are two small tmpfs
+    # mounts in memory: /tmp, and the private folder for the operator socket
+    # (owned by the "node" user, uid 1000). No Linux capabilities, no
+    # privilege escalation, and no core dumps (a crash must never write
+    # memory, and so keys, to disk). Runs as "node" (see its Dockerfile).
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run/secrets-operator:uid=1000,gid=1000,mode=0700
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+    # Like storage: internal network only, no port published to the host.
+    environment:
+      DATABASE_URL: *secrets-database-url
+      MAX_SECRET_BYTES: *max-secret-bytes
+      INTERNAL_SERVICE_TOKEN: *internal-service-token
+      IDENTITY_SERVICE_TOKEN: *identity-service-token
+      # Every secret read and change, and every seal change, is recorded
+      # here first (refused with 503 if it can't be).
+      AUDIT_URL: http://audit:3003
+      AUDIT_TOKEN: *audit-token-secrets
+      SERVICE_VERSION: ${SERVICE_VERSION:-dev}
+      # Sealed startup (docs/decisions/0012-sealed-startup.md). There is no
+      # master key setting: the service starts sealed and an operator
+      # unseals it with 3 of the 5 shares made at initialisation.
+      UNSEAL_TIMEOUT_MS: ${UNSEAL_TIMEOUT_MS:-600000}
+      UNSEAL_MAX_FAILED_ATTEMPTS: ${UNSEAL_MAX_FAILED_ATTEMPTS:-5}
+      UNSEAL_LOCKOUT_MS: ${UNSEAL_LOCKOUT_MS:-300000}
+      SEAL_DRAIN_TIMEOUT_MS: ${SEAL_DRAIN_TIMEOUT_MS:-10000}
+      SHUTDOWN_TIMEOUT_MS: 25000
+    networks:
+      - internal
+    depends_on:
+      secrets-migrate:
+        condition: service_completed_successfully
+      audit:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3002/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+      start_interval: 1s
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  storage:
+    image: secure-cloud-platform/storage:dev
+    build:
+      context: .
+      dockerfile: services/storage/Dockerfile
+    # No "ports:" here, so storage can't be reached from the host. It is only
+    # on the internal network, which also has no route to the outside world.
+    # Every file is encrypted before it reaches the volume, with a file key
+    # wrapped by the secrets service (docs/decisions/0014-encrypted-storage.md).
+    environment:
+      DATABASE_URL: *storage-database-url
+      SECRETS_URL: http://secrets:3002
+      INTERNAL_SERVICE_TOKEN: *internal-service-token
+      MAX_UPLOAD_BYTES: *max-upload-bytes
+      STORAGE_QUOTA_BYTES: ${STORAGE_QUOTA_BYTES:-5368709120}
+      # File events are recorded best effort (docs/decisions/0015).
+      AUDIT_URL: http://audit:3003
+      AUDIT_TOKEN: *audit-token-storage
+      SERVICE_VERSION: ${SERVICE_VERSION:-dev}
+      SHUTDOWN_TIMEOUT_MS: 25000
+    networks:
+      - internal
+    volumes:
+      - storage-data:/data
+    depends_on:
+      storage-migrate:
+        condition: service_completed_successfully
+      audit:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+      start_interval: 1s
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  # The dashboard frontend (apps/dashboard, Next.js), on
+  # http://localhost:3000. The browser loads the pages from here and calls
+  # the gateway's dashboard API directly (DASHBOARD_API_ORIGIN), with its
+  # session cookie (docs/decisions/0017-dashboard-frontend.md).
+  dashboard:
+    image: secure-cloud-platform/dashboard:dev
+    build:
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      # Where the browser reaches the gateway. localhost (not 127.0.0.1), the
+      # same site as the dashboard, so the SameSite=Lax cookie is sent.
+      DASHBOARD_API_ORIGIN: ${DASHBOARD_API_ORIGIN:-http://localhost:8080}
+    ports:
+      - "127.0.0.1:${DASHBOARD_PORT:-3000}:3000"
+    networks:
+      - public
+    depends_on:
+      gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/login"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+      start_interval: 1s
+    restart: unless-stopped
+
+  # The demo shop (apps/demo-shop), on http://localhost:3100. LOCAL
+  # DEVELOPMENT AND TESTS ONLY, never deployed: a pretend customer that uses
+  # the platform through the public /v1 API with its own API key, held only
+  # by this container (docs/decisions/0018-demo-shop.md). Until
+  # `LOCAL_DEV_MODE=true pnpm demo:setup` writes .local/demo-shop.env, it
+  # runs but says it isn't connected.
+  demo-shop:
+    image: secure-cloud-platform/demo-shop:dev
+    build:
+      context: .
+      dockerfile: apps/demo-shop/Dockerfile
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    env_file:
+      - path: .local/demo-shop.env
+        required: false
+    environment:
+      # The gateway, reached from this container (not from browsers).
+      PLATFORM_API_URL: http://gateway:8080
+    ports:
+      - "127.0.0.1:${DEMO_SHOP_PORT:-3100}:3000"
+    networks:
+      - public
+    depends_on:
+      gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+      start_interval: 1s
+    restart: unless-stopped
+
+  # A pretend outside API for the proxy route. LOCAL DEVELOPMENT AND TESTS
+  # ONLY: internal network, no port published, and not in
+  # deploy/docker-compose.yml. See tools/mock-upstream/src/server.ts.
+  mock-upstream:
+    image: secure-cloud-platform/mock-upstream:dev
+    build:
+      context: .
+      dockerfile: tools/mock-upstream/Dockerfile
+    read_only: true
+    cap_drop:
+      - ALL
+    environment:
+      # The pretend payment provider's key for the demo shop: a fake,
+      # local-only value (pnpm demo:setup stores the same one as a secret).
+      MOCK_PAYMENT_API_KEY: ${MOCK_PAYMENT_API_KEY:-local-demo-payment-key}
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+      start_interval: 1s
+    restart: unless-stopped
+
+  # Rate limit counters, shared by all gateway nodes. Nothing is saved to
+  # disk: counters only matter for the current minute.
+  redis:
+    image: redis:8.10.1-alpine
+    # The image's unprivileged "redis" user.
+    user: "999:1000"
+    environment:
+      REDIS_PASSWORD: *redis-password
+      # Lets redis-cli (the health check) log in without the password on its
+      # command line.
+      REDISCLI_AUTH: *redis-password
+    command:
+      - sh
+      - -c
+      - >-
+        exec redis-server --requirepass "$$REDIS_PASSWORD"
+        --save "" --appendonly no
+        --maxmemory 64mb --maxmemory-policy volatile-ttl
+    # Internal network only, no port published to the host.
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+      start_interval: 1s
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:18.6-alpine
+    # The image's unprivileged "postgres" user (uid/gid 70 on Alpine).
+    user: "70:70"
+    environment:
+      POSTGRES_DB: platform
+      POSTGRES_USER: platform
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-only-postgres-password}
+    # Like storage: internal network only, no port published to the host.
+    networks:
+      - internal
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      # Over TCP, like the services connect. On first start the image runs a
+      # temporary, socket-only server to initialise the database; checking
+      # the socket would report healthy too early.
+      test:
+        [
+          "CMD",
+          "pg_isready",
+          "--host=127.0.0.1",
+          "--username=platform",
+          "--dbname=platform",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+      start_interval: 1s
+    restart: unless-stopped
+
+networks:
+  public:
+  internal:
+    internal: true
+
+volumes:
+  storage-data:
+  postgres-data:

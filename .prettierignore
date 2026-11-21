@@ -1,0 +1,19 @@
+dist/
+coverage/
+target/
+pnpm-lock.yaml
+.cache/
+.local/
+
+# Written by drizzle-kit (pnpm db:generate), kept exactly as generated
+**/drizzle/meta/
+
+# Generated from the gateway route schemas (pnpm api:generate)
+api/openapi.v1.json
+api/openapi.dashboard.json
+
+# The dashboard's build output and generated API types
+.next/
+apps/dashboard/src/lib/api/schema.d.ts
+apps/demo-shop/src/lib/platform/schema.d.ts
+next-env.d.ts

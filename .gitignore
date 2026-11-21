@@ -11,3 +11,7 @@ target/
 next-env.d.ts
 *.tsbuildinfo
 .local/
+reports/
+.migrations-check/
+playwright-report/
+test-results/

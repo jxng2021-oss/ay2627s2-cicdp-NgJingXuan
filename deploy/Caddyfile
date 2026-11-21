@@ -1,0 +1,49 @@
+# Caddy: HTTPS in front of the dashboard and the gateway (docs/decisions/0031).
+# Copied next to docker-compose.yml on every deployment. deploy.sh sets the
+# two host names from DASHBOARD_ORIGIN and DASHBOARD_API_ORIGIN, e.g.
+#   DASHBOARD_HOST=myname.duckdns.org   API_HOST=api.myname.duckdns.org
+# Caddy gets and renews their Let's Encrypt certificates itself, and keeps
+# them on the data volume so redeployments don't ask for new ones.
+{
+	# Caddy runs as an unprivileged user, which can't listen on ports below
+	# 1024; Docker maps the host's 80 and 443 to these.
+	http_port 8080
+	https_port 8443
+	# The automatic HTTP -> HTTPS redirect would add ":8443"; the block at
+	# the end redirects instead.
+	auto_https disable_redirects
+	# No admin API: nothing changes the configuration while it runs.
+	admin off
+}
+
+(common) {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	log {
+		output stdout
+		format json
+	}
+}
+
+{$DASHBOARD_HOST} {
+	import common
+	reverse_proxy dashboard:3000
+}
+
+{$API_HOST} {
+	import common
+	# Uploads stream straight through (the gateway enforces its own limit),
+	# and Caddy sets X-Forwarded-For to the real client address; the
+	# gateway trusts that header only from Caddy's fixed address
+	# (TRUST_PROXY in docker-compose.yml).
+	reverse_proxy gateway:8080 {
+		flush_interval -1
+	}
+}
+
+http:// {
+	redir https://{host}{uri} permanent
+}

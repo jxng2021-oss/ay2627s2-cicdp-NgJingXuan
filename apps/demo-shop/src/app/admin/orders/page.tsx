@@ -20,7 +20,7 @@ export default async function AdminOrdersPage() {
       <PageHeader
         label="Admin"
         title="Orders"
-        description="Signed receipts, stored encrypted on secure-cloud."
+        description="Receipts, stored as encrypted files on secure-cloud."
       />
       {problem && <ErrorBanner error={problem} />}
       {!problem && receipts.length === 0 ? (

@@ -1,0 +1,15 @@
+# cargo audit settings, used by `pnpm scan:rust`. Every ignore needs a written
+# reason and must be one advisory (CLAUDE.md, "Every scanner ignore needs a
+# written reason").
+
+[advisories]
+ignore = [
+  # libsqlite3-sys (C SQLite CVE). Only in Cargo.lock because sqlx lists its
+  # SQLite driver there; storage enables only the "postgres" feature, so this
+  # crate is never compiled (`cargo tree -i libsqlite3-sys` finds nothing).
+  "RUSTSEC-2026-0459",
+  # rsa (Marvin timing attack, no fixed 0.9 release). Only in Cargo.lock
+  # because sqlx lists its MySQL driver there; never compiled for the same
+  # reason (`cargo tree -i rsa` finds nothing).
+  "RUSTSEC-2023-0071",
+]

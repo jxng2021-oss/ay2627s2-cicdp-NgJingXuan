@@ -62,6 +62,6 @@ export function platformError(
   });
 }
 
-export const API_KEY = "sk_test_0123456789abcdef0123456789abcdef";
+export const API_KEY = "sk_local_fake-key-for-the-sdk-tests-only";
 export const POOL_ID = "8b9e3c1a-2d4f-4a6b-9c8d-1e2f3a4b5c6d";
 export const FILE_ID = "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70";
