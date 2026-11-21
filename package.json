@@ -63,7 +63,19 @@
     "e2e:start": "node scripts/e2e-compose.ts up --build --detach --wait --wait-timeout 180",
     "stack:up": "node scripts/e2e-compose.ts up --detach --wait --wait-timeout 180",
     "stack:down": "docker compose down --volumes",
-    "docker:build": "docker compose build"
+    "docker:build": "docker compose build",
+    "test:ui": "pnpm --filter @platform/dashboard test:ui",
+    "test:ui:install": "pnpm --filter @platform/dashboard exec playwright install --with-deps chromium",
+    "test:demo": "pnpm --filter @platform/demo-shop test:ui",
+    "db:generate": "pnpm --filter @platform/gateway --filter @platform/secrets --filter @platform/audit --filter @platform/identity --filter @platform/flags db:generate",
+    "db:check": "node scripts/check-migrations.ts",
+    "api:breaking": "node scripts/openapi.ts breaking",
+    "scan:secrets": "node scripts/security-scan.ts secrets",
+    "scan:code": "node scripts/security-scan.ts code",
+    "scan:deps": "node scripts/security-scan.ts deps",
+    "scan:images": "node scripts/security-scan.ts images",
+    "scan:rust": "cargo audit",
+    "scan:rust:install": "cargo install cargo-audit --locked --version 0.23.0"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
