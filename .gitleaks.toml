@@ -18,3 +18,16 @@ other kind of secret in it would still be reported.
 """
 targetRules = ["generic-api-key"]
 paths = ['''^tests/secrets/fixtures/compatibility-v1\.json$''']
+
+[[allowlists]]
+description = """
+Wrapped keys compatibility fixture for the Rust secrets service. It holds a
+TEST-ONLY file key and signing data key, wrapped by the TypeScript service with
+a FAKE tenant key that is written out in the file itself
+("fake-test-tenant-key-not-secret!"), so nothing in it protects anything real.
+Its base64 wrapped keys trip the generic-api-key rule. The Rust tests unwrap
+it to prove keys wrapped before the rewrite still work, so it must be committed
+as is. Only this one file, and only that one rule.
+"""
+targetRules = ["generic-api-key"]
+paths = ['''^tests/secrets-rs/fixtures/wrapped-keys-v1\.json$''']

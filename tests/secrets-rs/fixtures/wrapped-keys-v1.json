@@ -1,0 +1,20 @@
+{
+  "WARNING": "TEST-ONLY DATA. A file key and a signing data key wrapped by the TypeScript secrets service (format version 1) with a FAKE tenant key (the text below) that protects nothing. Never use it anywhere else. Never edit or regenerate this file: it proves keys wrapped before the Rust rewrite still unwrap. For a new format, add a new fixture file next to this one.",
+  "createdOn": "2026-11-21",
+  "tenantId": "c0de0000-0000-4000-8000-00000000fa4e",
+  "tenantKey": {
+    "keyVersion": 1,
+    "text": "fake-test-tenant-key-not-secret!",
+    "base64": "ZmFrZS10ZXN0LXRlbmFudC1rZXktbm90LXNlY3JldCE="
+  },
+  "fileKey": {
+    "fileId": "f11e0000-0000-4000-8000-0000000000f1",
+    "wrappedKey": "AQAAAAGN1EoF39Z+vdBW2VdBW5TaMthzjf80pDlSUlMxm/ElE4ic/jFjP6ccl1Utu3Wil8k3Az2ep9HOs2ZsYZI=",
+    "expectedText": "fake-test-file-key-not-a-secret!"
+  },
+  "signingKey": {
+    "poolId": "9001c000-0000-4000-8000-000000000001",
+    "wrappedKey": "AQAAAAGBhCuuBmbILBgUF7DWUtMs3S7tcBS4A3oXGneb901lHU51oJ5sKF8wVWzI/6p+n0ZLGWvWuY8EXUGdEj8=",
+    "expectedText": "fake-test-signing-key-not-secret"
+  }
+}

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["services/storage"]
+members = ["services/storage", "services/secrets-rs"]
 
 [workspace.package]
 edition = "2024"
