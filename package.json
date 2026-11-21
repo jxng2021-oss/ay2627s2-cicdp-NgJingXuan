@@ -7,16 +7,18 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "build": "pnpm build:secrets && pnpm build:audit && pnpm build:storage",
+    "build": "pnpm build:secrets && pnpm build:audit && pnpm build:gateway && pnpm build:storage",
     "build:secrets": "pnpm --filter @platform/secrets build",
     "build:audit": "pnpm --filter @platform/audit build",
+    "build:gateway": "pnpm --filter @platform/gateway build",
     "build:storage": "cargo build --locked --release -p storage",
     "lint": "pnpm lint:storage",
     "lint:storage": "cargo fmt --all --check && cargo clippy --locked -p storage --all-targets -- -D warnings",
-    "typecheck": "pnpm --filter @platform/secrets --filter @platform/audit typecheck && pnpm --filter @platform/tests exec tsc -p database",
+    "typecheck": "pnpm --filter @platform/secrets --filter @platform/audit --filter @platform/gateway typecheck && pnpm --filter @platform/tests exec tsc -p database",
     "test": "pnpm test:secrets && pnpm test:audit && pnpm test:storage",
     "test:secrets": "pnpm --filter @platform/secrets test",
     "test:audit": "pnpm --filter @platform/audit test",
+    "test:gateway": "pnpm --filter @platform/gateway test",
     "test:storage": "cargo test --locked -p storage",
     "test:database": "pnpm --filter @platform/tests exec vitest run --root database",
     "test:compat": "pnpm test:compat:secrets && pnpm test:compat:storage",
@@ -24,6 +26,7 @@
     "test:compat:storage": "cargo test --locked -p storage --test compatibility",
     "docker:build:secrets": "docker build --file services/secrets/Dockerfile --tag secure-cloud-platform/secrets:ci .",
     "docker:build:audit": "docker build --file services/audit/Dockerfile --tag secure-cloud-platform/audit:ci .",
+    "docker:build:gateway": "docker build --file services/gateway/Dockerfile --tag secure-cloud-platform/gateway:ci .",
     "docker:build:storage": "docker build --file services/storage/Dockerfile --tag secure-cloud-platform/storage:ci ."
   },
   "devDependencies": {
