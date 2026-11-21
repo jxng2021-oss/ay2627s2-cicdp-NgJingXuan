@@ -57,7 +57,7 @@ if ! "${COMPOSE[@]}" up --build --detach --wait --wait-timeout 300 --remove-orph
 fi
 "${COMPOSE[@]}" ps
 
-seal_status="$("${COMPOSE[@]}" exec -T secrets node dist/operator.js status --json 2>/dev/null || true)"
+seal_status="$("${COMPOSE[@]}" exec -T secrets secrets-operator status --json 2>/dev/null || true)"
 if [[ "$seal_status" == *'"initialised":false'* ]]; then
   echo "NEXT: initialise the secrets service (docs/deploy-ec2.md, step 6)."
 elif [[ "$seal_status" == *'"sealed":true'* ]]; then

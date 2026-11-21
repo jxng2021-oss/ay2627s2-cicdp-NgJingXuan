@@ -4,7 +4,6 @@ import { join, resolve } from "node:path";
 
 const SERVICES = [
   "services/gateway",
-  "services/secrets",
   "services/audit",
   "services/identity",
   "services/flags",

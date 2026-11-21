@@ -1,25 +1,20 @@
-
-FROM node:26-alpine AS build
-RUN npm install --global pnpm@10.34.9
+FROM rust:1.95-alpine3.22 AS build
+RUN apk add --no-cache musl-dev
 WORKDIR /repo
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
-COPY services/secrets/package.json services/secrets/
-RUN pnpm install --frozen-lockfile --filter @platform/secrets
-
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY services/storage/ services/storage/
 COPY services/secrets/ services/secrets/
-RUN pnpm --filter @platform/secrets build \
- && pnpm --filter @platform/secrets deploy --prod /out
+RUN cargo build --release --locked -p secrets --bin secrets --bin secrets-operator
 
-FROM node:26-alpine
-ENV NODE_ENV=production \
-    SECRETS_PORT=3002
-WORKDIR /app
+FROM alpine:3.22
+RUN addgroup -S -g 1000 secrets \
+ && adduser -S -D -H -u 1000 -G secrets secrets
+COPY --from=build /repo/target/release/secrets /usr/local/bin/secrets
+COPY --from=build /repo/target/release/secrets-operator /usr/local/bin/secrets-operator
 
-COPY --from=build /out ./
-
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
-
-USER node
+ENV SECRETS_PORT=3002
+USER secrets
 EXPOSE 3002
-CMD ["node", "dist/server.js"]
+ENTRYPOINT ["secrets"]
+CMD ["serve"]

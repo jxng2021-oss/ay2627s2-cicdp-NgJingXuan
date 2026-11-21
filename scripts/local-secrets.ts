@@ -17,16 +17,7 @@ function operator(
 ): { code: number; stdout: string; stderr: string } {
   const result = spawnSync(
     "docker",
-    [
-      "compose",
-      "exec",
-      "-T",
-      "secrets",
-      "node",
-      "dist/operator.js",
-      ...args,
-      "--json",
-    ],
+    ["compose", "exec", "-T", "secrets", "secrets-operator", ...args, "--json"],
     { input, encoding: "utf8" },
   );
   if (result.error) throw result.error;

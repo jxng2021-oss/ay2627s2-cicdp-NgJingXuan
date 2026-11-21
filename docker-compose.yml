@@ -195,7 +195,7 @@ services:
   secrets-migrate:
     image: secure-cloud-platform/secrets:dev
     pull_policy: never
-    command: ["node", "dist/migrate.js"]
+    command: ["migrate"]
     environment:
       DATABASE_URL: *secrets-database-url
     networks:
@@ -393,9 +393,9 @@ services:
     # Hardened: it holds the master key in memory while unsealed.
     # Read-only filesystem; the only writable places are two small tmpfs
     # mounts in memory: /tmp, and the private folder for the operator socket
-    # (owned by the "node" user, uid 1000). No Linux capabilities, no
+    # (owned by the "secrets" user, uid 1000). No Linux capabilities, no
     # privilege escalation, and no core dumps (a crash must never write
-    # memory, and so keys, to disk). Runs as "node" (see its Dockerfile).
+    # memory, and so keys, to disk). Runs as "secrets" (see its Dockerfile).
     read_only: true
     tmpfs:
       - /tmp

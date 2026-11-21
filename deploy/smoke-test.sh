@@ -140,7 +140,7 @@ internal_services=(storage postgres redis)
 seal_status=""
 if "${COMPOSE[@]}" config --services 2>/dev/null | grep -qx secrets; then
   internal_services+=(secrets)
-  seal_status="$("${COMPOSE[@]}" exec -T secrets node dist/operator.js status --json 2>/dev/null || true)"
+  seal_status="$("${COMPOSE[@]}" exec -T secrets secrets-operator status --json 2>/dev/null || true)"
   [[ "$seal_status" == *'"sealed":'* ]] || fail "could not read the secrets service's seal status"
 fi
 encrypted_storage=false

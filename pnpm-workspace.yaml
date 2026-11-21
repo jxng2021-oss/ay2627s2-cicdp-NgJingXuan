@@ -1,5 +1,4 @@
 packages:
-  - services/secrets
   - services/audit
   - services/gateway
   - services/flags

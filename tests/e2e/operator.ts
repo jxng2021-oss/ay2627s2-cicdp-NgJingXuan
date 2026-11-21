@@ -40,7 +40,7 @@ export function secretsOperator(
   input = "",
 ): Promise<CommandResult> {
   return dockerCompose(
-    ["exec", "-T", "secrets", "node", "dist/operator.js", ...args, "--json"],
+    ["exec", "-T", "secrets", "secrets-operator", ...args, "--json"],
     input,
   );
 }
