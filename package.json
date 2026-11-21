@@ -15,7 +15,7 @@
     "lint": "pnpm lint:storage",
     "lint:storage": "cargo fmt --all --check && cargo clippy --locked -p storage --all-targets -- -D warnings",
     "typecheck": "pnpm --filter @platform/secrets --filter @platform/audit --filter @platform/gateway typecheck && pnpm --filter @platform/tests exec tsc -p database",
-    "test": "pnpm test:secrets && pnpm test:audit && pnpm test:storage",
+    "test": "pnpm test:secrets && pnpm test:audit && pnpm test:gateway && pnpm test:storage",
     "test:secrets": "pnpm --filter @platform/secrets test",
     "test:audit": "pnpm --filter @platform/audit test",
     "test:gateway": "pnpm --filter @platform/gateway test",
@@ -27,7 +27,9 @@
     "docker:build:secrets": "docker build --file services/secrets/Dockerfile --tag secure-cloud-platform/secrets:ci .",
     "docker:build:audit": "docker build --file services/audit/Dockerfile --tag secure-cloud-platform/audit:ci .",
     "docker:build:gateway": "docker build --file services/gateway/Dockerfile --tag secure-cloud-platform/gateway:ci .",
-    "docker:build:storage": "docker build --file services/storage/Dockerfile --tag secure-cloud-platform/storage:ci ."
+    "docker:build:storage": "docker build --file services/storage/Dockerfile --tag secure-cloud-platform/storage:ci .",
+    "api:generate": "pnpm --filter @platform/gateway build && node scripts/openapi.ts generate",
+    "api:check": "pnpm --filter @platform/gateway build && node scripts/openapi.ts check"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

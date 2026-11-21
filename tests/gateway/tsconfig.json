@@ -1,0 +1,4 @@
+{
+  "extends": "../../services/gateway/tsconfig.json",
+  "include": ["."]
+}
