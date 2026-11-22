@@ -38,7 +38,21 @@ install -d -o 1000 -g 1000 -m 0750 "$DATA_DIR/files"
 install -d -o 70 -g 70 -m 0700 "$DATA_DIR/postgres"
 install -d -o 1001 -g 1001 -m 0700 "$DATA_DIR/caddy"
 
-commit="$(git -C "$APP_DIR/.." rev-parse HEAD 2>/dev/null || echo unknown)"
+REPO_DIR="$(cd "$APP_DIR/.." && pwd)"
+commit="$(git -c safe.directory="$REPO_DIR" -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
+
+IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-}"
+IMAGE_TAG="${IMAGE_TAG:-}"
+if [[ -n "$IMAGE_REPOSITORY" ]]; then
+  [[ "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]] || fail "IMAGE_TAG must be the full commit SHA of the images to deploy"
+  [[ "$IMAGE_TAG" == "$commit" ]] || fail "the deploy files are at commit $commit but the images are for $IMAGE_TAG"
+  registry="${IMAGE_REPOSITORY%%/*}"
+  region="${AWS_REGION:-$(cut -d. -f4 <<<"$registry")}"
+  aws ecr get-login-password --region "$region" |
+    docker login --username AWS --password-stdin "$registry" >/dev/null ||
+    fail "could not log in to $registry (does the instance role allow pulling from ECR?)"
+fi
+
 cat >"$APP_DIR/.env" <<EOF
 DATA_DIR=$DATA_DIR
 SERVICE_VERSION=$commit
@@ -48,9 +62,18 @@ DASHBOARD_HOST=$DOMAIN
 API_HOST=api.$DOMAIN
 API_KEY_PREFIX=sk_live_
 EOF
+if [[ -n "$IMAGE_REPOSITORY" ]]; then
+  printf 'IMAGE_REPOSITORY=%s\nIMAGE_TAG=%s\n' "$IMAGE_REPOSITORY" "$IMAGE_TAG" >>"$APP_DIR/.env"
+  echo "Pulling the images CI tested for commit $commit ..."
+  "${COMPOSE[@]}" pull --quiet || fail "could not pull the images for commit $commit"
+  start=(up --no-build)
+else
+  echo "Building the images on this server for commit $commit ..."
+  start=(up --build)
+fi
 
-echo "Building and starting commit $commit for https://$DOMAIN ..."
-if ! "${COMPOSE[@]}" up --build --detach --wait --wait-timeout 300 --remove-orphans; then
+echo "Starting commit $commit for https://$DOMAIN ..."
+if ! "${COMPOSE[@]}" "${start[@]}" --detach --wait --wait-timeout 300 --remove-orphans; then
   "${COMPOSE[@]}" ps --all || true
   "${COMPOSE[@]}" logs --no-color --tail 100 || true
   fail "containers did not become healthy"
