@@ -528,7 +528,7 @@ jobs:
                 "export PATH=\"$PATH:/snap/bin\"",
                 "sudo -u ubuntu git -C \($dir) fetch --quiet origin",
                 "sudo -u ubuntu git -C \($dir) checkout --quiet --detach \($sha)",
-                "AWS_REGION=\($region) IMAGE_REPOSITORY=\($repo) IMAGE_TAG=\($sha) \($dir)/deploy/deploy.sh \($domain)"
+                "AWS_REGION=\($region) IMAGE_REPOSITORY=\($repo) IMAGE_TAG=\($sha) bash \($dir)/deploy/deploy.sh \($domain)"
               ],
               executionTimeout: ["1500"]
             }')"

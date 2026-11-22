@@ -44,7 +44,9 @@ push to main → CI (every job) → ci-success → publish → deploy
 There are no long-lived keys anywhere:
 
 - GitHub gets short-lived AWS credentials through OIDC. The IAM role trusts
-  only `repo:jxng2021-oss/ay2627s2-cicdp-NgJingXuan:ref:refs/heads/main`, and
+  only `repo:jxng2021-oss@261221037/ay2627s2-cicdp-NgJingXuan@1437998972:ref:refs/heads/main`
+  (GitHub's immutable subject: a deleted and recreated repository with the
+  same name gets new IDs, so it cannot take over the role), and
   may only push to the seven ECR repositories and run `AWS-RunShellScript`
   on this one instance.
 - The instance pulls from ECR with its own instance role.

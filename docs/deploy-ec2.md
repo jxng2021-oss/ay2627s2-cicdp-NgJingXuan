@@ -99,7 +99,13 @@ Check that Systems Manager sees the instance: AWS console → Systems Manager
 IAM → **Roles → Create role** → **Web identity** → provider
 `token.actions.githubusercontent.com`, audience `sts.amazonaws.com` → name
 it `secure-cloud-github-deploy`. Then **Trust relationships → Edit** and
-replace it with (only this repository's `main` branch may use the role):
+replace it with (only this repository's `main` branch may use the role).
+
+The repository uses GitHub's immutable subject format, which adds the owner's
+and the repository's numeric IDs. Check the exact prefix with
+`gh api repos/jxng2021-oss/ay2627s2-cicdp-NgJingXuan/actions/oidc/customization/sub`
+(`sub_claim_prefix`); a subject that does not match gives
+"Not authorized to perform sts:AssumeRoleWithWebIdentity".
 
 ```json
 {
@@ -114,7 +120,7 @@ replace it with (only this repository's `main` branch may use the role):
       "Condition": {
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:sub": "repo:jxng2021-oss/ay2627s2-cicdp-NgJingXuan:ref:refs/heads/main"
+          "token.actions.githubusercontent.com:sub": "repo:jxng2021-oss@261221037/ay2627s2-cicdp-NgJingXuan@1437998972:ref:refs/heads/main"
         }
       }
     }
