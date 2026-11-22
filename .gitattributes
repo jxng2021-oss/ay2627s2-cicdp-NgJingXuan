@@ -1,0 +1,4 @@
+# Migrations are checksummed by their exact bytes and shell scripts run on Linux,
+# so both keep LF line endings on every machine, whatever core.autocrlf says.
+*.sql text eol=lf
+*.sh text eol=lf
