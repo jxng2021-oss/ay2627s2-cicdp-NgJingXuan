@@ -1,7 +1,18 @@
-FROM rust:1.95-alpine3.22 AS build
-RUN apk add --no-cache musl-dev
+FROM rust:1.95-alpine3.22 AS chef
+RUN apk add --no-cache musl-dev \
+ && cargo install cargo-chef --locked --version 0.1.78
 WORKDIR /repo
 
+FROM chef AS planner
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY services/storage/ services/storage/
+COPY services/secrets/ services/secrets/
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS build
+COPY rust-toolchain.toml ./
+COPY --from=planner /repo/recipe.json recipe.json
+RUN cargo chef cook --release --locked -p secrets --recipe-path recipe.json
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY services/storage/ services/storage/
 COPY services/secrets/ services/secrets/
