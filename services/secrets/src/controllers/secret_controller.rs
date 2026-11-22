@@ -10,8 +10,16 @@ use crate::audit::AuditEvent;
 use crate::context::RequestContext;
 use crate::errors::AppError;
 use crate::input::{Query, SecretName, read_json, value_body};
+use crate::sensitive::{capacity_for, sensitive_json};
 use crate::services::secret_service::{SavedVersion, ServiceError};
 use crate::time::iso;
+
+#[derive(serde::Serialize)]
+struct InjectionAnswer<'a> {
+    name: &'a str,
+    version: i32,
+    value: &'a str,
+}
 
 fn metadata(saved: &SavedVersion) -> serde_json::Value {
     json!({ "name": saved.name, "version": saved.version, "createdAt": iso(&saved.created_at) })
@@ -204,15 +212,15 @@ pub async fn read_for_injection(
         .await?
         .ok_or_else(AppError::secret_not_found)?;
     record(&state, &context, "secret.read", &found.name).await?;
-    let body = zeroize::Zeroizing::new(
-        json!({ "name": found.name, "version": found.version, "value": found.value.as_str() })
-            .to_string(),
-    );
-    Ok((
-        [("content-type", "application/json; charset=utf-8")],
-        body.to_string(),
-    )
-        .into_response())
+    let body = InjectionAnswer {
+        name: &found.name,
+        version: found.version,
+        value: found.value.as_str(),
+    };
+    Ok(sensitive_json(
+        &body,
+        capacity_for(found.value.len() + found.name.len()),
+    ))
 }
 
 pub async fn shred_tenant(

@@ -12,6 +12,7 @@ use crate::context::RequestContext;
 use crate::errors::AppError;
 use crate::input::{KeyBody, key_body, read_json};
 use crate::keys::{Key, key_from_slice};
+use crate::sensitive::{capacity_for, sensitive_json};
 
 const PLAIN_KEY_CHARACTERS: usize = 43;
 const WRAPPED_KEY_CHARACTERS: usize = 87;
@@ -48,13 +49,14 @@ fn wrapped_key(text: &str) -> Result<Vec<u8>, AppError> {
         .map_err(|_| AppError::bad_request("body/wrappedKey must be base64"))
 }
 
+#[derive(serde::Serialize)]
+struct KeyAnswer<'a> {
+    key: &'a str,
+}
+
 fn key_answer(key: &Key) -> Response {
-    let body = Zeroizing::new(json!({ "key": STANDARD.encode(key.as_ref()) }).to_string());
-    (
-        [("content-type", "application/json; charset=utf-8")],
-        body.to_string(),
-    )
-        .into_response()
+    let encoded = Zeroizing::new(STANDARD.encode(key.as_ref()));
+    sensitive_json(&KeyAnswer { key: &encoded }, capacity_for(encoded.len()))
 }
 
 pub async fn wrap_file_key(

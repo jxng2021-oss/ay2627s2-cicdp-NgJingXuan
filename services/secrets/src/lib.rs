@@ -12,5 +12,6 @@ pub mod logging;
 pub mod models;
 pub mod operator;
 pub mod seal;
+pub mod sensitive;
 pub mod services;
 pub mod time;
