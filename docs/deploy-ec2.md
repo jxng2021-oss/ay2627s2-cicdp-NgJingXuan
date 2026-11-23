@@ -179,14 +179,15 @@ seven repositories, run the deploy on this one instance, read its result):
 The repository → **Settings → Secrets and variables → Actions → Variables**
 (variables, not secrets: none of these is a secret):
 
-| Variable              | Value                                                     |
-| --------------------- | --------------------------------------------------------- |
-| `AWS_REGION`          | `ap-southeast-1`                                          |
-| `ECR_REGISTRY`        | `ACCOUNT_ID.dkr.ecr.ap-southeast-1.amazonaws.com`         |
-| `AWS_DEPLOY_ROLE_ARN` | `arn:aws:iam::ACCOUNT_ID:role/secure-cloud-github-deploy` |
-| `EC2_INSTANCE_ID`     | `i-…`                                                     |
-| `DEPLOY_DOMAIN`       | `NAME.duckdns.org`                                        |
-| `DEPLOY_PATH`         | optional; default `/home/ubuntu/secure-cloud`             |
+| Variable              | Value                                                                                                       |
+| --------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `AWS_REGION`          | `ap-southeast-1`                                                                                            |
+| `ECR_REGISTRY`        | `ACCOUNT_ID.dkr.ecr.ap-southeast-1.amazonaws.com`                                                           |
+| `AWS_DEPLOY_ROLE_ARN` | `arn:aws:iam::ACCOUNT_ID:role/secure-cloud-github-deploy`                                                   |
+| `EC2_INSTANCE_ID`     | `i-…`                                                                                                       |
+| `DEPLOY_DOMAIN`       | `NAME.duckdns.org`                                                                                          |
+| `DEPLOY_PATH`         | optional; default `/home/ubuntu/secure-cloud`                                                               |
+| `PROXY_ALLOWED_HOSTS` | optional; outside hosts the proxy route may call, e.g. `api.example.com,abc123.mock.pstmn.io` (empty: none) |
 
 Until `AWS_DEPLOY_ROLE_ARN` is set, the publish and deploy jobs skip
 themselves.

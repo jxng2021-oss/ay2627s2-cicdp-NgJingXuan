@@ -6,7 +6,11 @@ import {
   RoleName as PoolRoleName,
 } from "./user-pool-schemas.js";
 import { Type, type TObject, type TProperties } from "typebox";
-import { listAuditEventsSchema } from "./audit-schemas.js";
+import {
+  listAuditEventsSchema,
+  PoolAuditEventsQuery,
+  PoolAuditPage,
+} from "./audit-schemas.js";
 import {
   EnvironmentSettings as FlagEnvironmentSettings,
   Environment as FlagEnvironment,
@@ -877,6 +881,7 @@ const PoolUserSchema = Type.Object(
     email: Type.String(),
     status: Type.Enum(["active", "disabled"]),
     locked: Type.Boolean(),
+    passwordResetRequired: Type.Boolean(),
     attributes: Type.Record(
       Type.String(),
       Type.Union([Type.String(), Type.Number(), Type.Boolean()]),
@@ -1092,20 +1097,38 @@ export const deletePoolUserSchema = poolRoute(
 );
 export const resetPoolUserPasswordSchema = poolRoute(
   "resetPoolUserPassword",
-  "Reset a user's password: a temporary password, shown once",
+  "Require a password reset: the user's sessions end and their next sign-in asks them to choose a new password",
   true,
   {
     params: PoolUserParams,
     response: {
-      200: json(
-        "The temporary password. Give it to the user; it isn't shown again.",
-        Type.Object(
-          { temporaryPassword: Type.String() },
-          { additionalProperties: false },
-        ),
-      ),
+      200: json("The user, with passwordResetRequired", PoolUserSchema),
       ...ownerErrors,
     },
+  },
+);
+
+export const unlockPoolUserSchema = poolRoute(
+  "unlockPoolUser",
+  "Unlock a user locked after repeated wrong passwords",
+  true,
+  {
+    params: PoolUserParams,
+    response: {
+      200: json("The user, no longer locked", PoolUserSchema),
+      ...ownerErrors,
+    },
+  },
+);
+
+export const listPoolAuditEventsSchema = poolRoute(
+  "listPoolAuditEvents",
+  "A user pool's own audit log, newest first (separate from the workspace's)",
+  false,
+  {
+    params: PoolIdParams,
+    querystring: PoolAuditEventsQuery,
+    response: { 200: json("One page of events", PoolAuditPage), ...poolErrors },
   },
 );
 

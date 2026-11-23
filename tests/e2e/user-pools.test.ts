@@ -5,6 +5,7 @@ import { freshWindow, GATEWAY_URL, psql } from "./helpers.js";
 const ORIGIN = process.env.DASHBOARD_ORIGIN ?? "http://localhost:3000";
 const PASSWORD = `e2e-pools-${randomBytes(8).toString("hex")}`;
 const END_USER_PASSWORD = `end-user-${randomBytes(8).toString("hex")}`;
+const NEW_PASSWORD = `new-end-user-${randomBytes(8).toString("hex")}`;
 
 class Browser {
   private readonly jar = new Map<string, string>();
@@ -40,12 +41,15 @@ interface Tokens {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
+  passwordResetRequired: boolean;
   user: { id: string; email: string };
 }
 
 let pool = "";
 let issuer = "";
 let apiKey = "";
+let workspace = "";
+const owner = new Browser();
 
 function app(method: string, path: string, body?: unknown) {
   return fetch(`${GATEWAY_URL}/v1${path}`, {
@@ -84,14 +88,13 @@ function verifyJwt(token: string, keys: Record<string, string>[]) {
 
 beforeAll(async () => {
   await freshWindow();
-  const owner = new Browser();
   const signUp = await owner.call("POST", "/auth/sign-up", {
     email: `e2e-pools-${randomBytes(4).toString("hex")}@example.test`,
     password: PASSWORD,
     workspaceName: "Pools workspace",
   });
   expect(signUp.status).toBe(201);
-  const workspace = ((await signUp.json()) as { workspaces: { id: string }[] })
+  workspace = ((await signUp.json()) as { workspaces: { id: string }[] })
     .workspaces[0]!.id;
   owner.csrf = (
     (await (await owner.call("GET", "/auth/csrf")).json()) as {
@@ -178,14 +181,59 @@ describe("user pools", () => {
     expect((await refresh(renewed.refreshToken)).status).toBe(401);
   });
 
-  it("sign-ins and the token reuse are in the workspace's audit log", async () => {
-    const events = await app(
-      "GET",
-      "/audit-events?resourceType=pool_user&limit=50",
+  it("an owner's reset makes the next sign-in ask for a new password, until it is changed", async () => {
+    const signIn = (password: string) =>
+      app("POST", `/user-pools/${pool}/sessions`, {
+        email: tokens.user.email,
+        password,
+      });
+    const userPath = `/workspaces/${workspace}/user-pools/${pool}/users/${tokens.user.id}`;
+
+    const reset = await owner.call("POST", `${userPath}/reset-password`);
+    expect(reset.status).toBe(200);
+    expect(await reset.json()).toMatchObject({ passwordResetRequired: true });
+
+    const flagged = await signIn(END_USER_PASSWORD);
+    expect(flagged.status).toBe(200);
+    expect(((await flagged.json()) as Tokens).passwordResetRequired).toBe(true);
+
+    const changed = await app(
+      "POST",
+      `/user-pools/${pool}/users/${tokens.user.id}/password`,
+      { currentPassword: END_USER_PASSWORD, newPassword: NEW_PASSWORD },
     );
-    expect(events.status).toBe(200);
+    expect(changed.status).toBe(204);
+    const after = await signIn(NEW_PASSWORD);
+    expect(((await after.json()) as Tokens).passwordResetRequired).toBe(false);
+  });
+
+  it("an owner unlocks a user locked after 5 wrong passwords", async () => {
+    const signIn = (password: string) =>
+      app("POST", `/user-pools/${pool}/sessions`, {
+        email: tokens.user.email,
+        password,
+      });
+    for (let i = 0; i < 5; i++) await signIn("not-the-password-1");
+    expect((await signIn(NEW_PASSWORD)).status).toBe(401);
+    const userPath = `/workspaces/${workspace}/user-pools/${pool}/users/${tokens.user.id}`;
+    expect(await (await owner.call("GET", userPath)).json()).toMatchObject({
+      status: "active",
+      locked: true,
+    });
+
+    const unlocked = await owner.call("POST", `${userPath}/unlock`);
+    expect(unlocked.status).toBe(200);
+    expect((await signIn(NEW_PASSWORD)).status).toBe(200);
+  });
+
+  it("the pool's events are in its own log, not the workspace's", async () => {
+    const poolLog = await owner.call(
+      "GET",
+      `/workspaces/${workspace}/user-pools/${pool}/audit-events?limit=100`,
+    );
+    expect(poolLog.status).toBe(200);
     const actions = (
-      (await events.json()) as { events: { action: string }[] }
+      (await poolLog.json()) as { events: { action: string }[] }
     ).events.map((event) => event.action);
     expect(actions).toEqual(
       expect.arrayContaining([
@@ -193,8 +241,29 @@ describe("user pools", () => {
         "pool_user.logged_in",
         "pool_user.login_failed",
         "pool_user.token_reused",
+        "pool_user.password_reset",
+        "pool_user.password_changed",
+        "pool_user.unlocked",
       ]),
     );
+
+    const workspaceLog = await app("GET", "/audit-events?limit=100");
+    expect(workspaceLog.status).toBe(200);
+    const workspaceActions = (
+      (await workspaceLog.json()) as { events: { action: string }[] }
+    ).events.map((event) => event.action);
+    expect(workspaceActions).toContain("user_pool.created");
+    expect(workspaceActions.some((a) => a.startsWith("pool_user."))).toBe(
+      false,
+    );
+
+    const audit = psql(
+      "audit_app",
+      "audit",
+      `select count(*) from audit_events where chain = 'pool:${pool}';`,
+    );
+    expect(audit.ok).toBe(true);
+    expect(Number(audit.output.match(/\d+/)?.[0])).toBeGreaterThan(5);
   });
 
   it("stores only hashes and an encrypted signing key", () => {
@@ -207,6 +276,7 @@ describe("user pools", () => {
     expect(dump.output).toContain("$argon2id$");
     for (const secret of [
       END_USER_PASSWORD,
+      NEW_PASSWORD,
       tokens.refreshToken,
       "BEGIN PRIVATE KEY",
     ]) {

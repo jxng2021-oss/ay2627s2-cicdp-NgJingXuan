@@ -178,5 +178,16 @@ export function dashboardPoolsController(pools: UserPoolsForwarder["forward"]) {
           "/reset-password",
         ),
       ),
+
+    unlockPoolUser: (
+      request: Req<typeof schemas.unlockPoolUserSchema>,
+      reply: Rep<typeof schemas.unlockPoolUserSchema>,
+    ) =>
+      pools(
+        request,
+        reply,
+        "POST",
+        userPath(request.params.poolId, request.params.userId, "/unlock"),
+      ),
   };
 }

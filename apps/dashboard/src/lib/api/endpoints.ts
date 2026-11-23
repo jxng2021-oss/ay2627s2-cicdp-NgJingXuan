@@ -8,6 +8,7 @@ import {
   uploadFile,
   type ApiKeyList,
   type AuditList,
+  type PoolAuditList,
   type ConnectionList,
   type ConnectionPolicy,
   type ConnectionUsage,
@@ -265,12 +266,27 @@ export const workspace = {
       ws(id, `/user-pools/${name(poolId)}/users/${name(userId)}`),
     ),
   resetPoolUserPassword: (id: string, poolId: string, userId: string) =>
-    request<{ temporaryPassword: string }>(
+    request<PoolUser>(
       "POST",
       ws(
         id,
         `/user-pools/${name(poolId)}/users/${name(userId)}/reset-password`,
       ),
+    ),
+  unlockPoolUser: (id: string, poolId: string, userId: string) =>
+    request<PoolUser>(
+      "POST",
+      ws(id, `/user-pools/${name(poolId)}/users/${name(userId)}/unlock`),
+    ),
+  poolAuditEvents: (
+    id: string,
+    poolId: string,
+    query: Record<string, string | number | undefined>,
+  ) =>
+    request<PoolAuditList>(
+      "GET",
+      ws(id, `/user-pools/${name(poolId)}/audit-events`),
+      { query },
     ),
 
   flags: (id: string) => request<FlagList>("GET", ws(id, "/flags")),

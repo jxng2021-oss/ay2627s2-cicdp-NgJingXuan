@@ -76,6 +76,7 @@ export function createIdentityController(services: IdentityServices) {
     email: user.email,
     status: user.status,
     locked: user.lockedUntil !== null && user.lockedUntil.getTime() > now(),
+    passwordResetRequired: user.passwordResetRequired,
     attributes: user.attributes,
     roles,
     createdAt: user.createdAt.toISOString(),
@@ -98,6 +99,7 @@ export function createIdentityController(services: IdentityServices) {
     tokenType: tokens.tokenType,
     expiresIn: tokens.expiresIn,
     refreshToken: tokens.refreshToken,
+    passwordResetRequired: tokens.user.passwordResetRequired,
     user: userJson(tokens),
   });
 
@@ -191,13 +193,23 @@ export function createIdentityController(services: IdentityServices) {
       return noContent(reply);
     },
 
-    resetPassword: async (request: Req<UserP>) => ({
-      temporaryPassword: await users.resetPassword(
-        actorOf(request),
-        request.params.poolId,
-        request.params.userId,
+    resetPassword: async (request: Req<UserP>) =>
+      userJson(
+        await users.resetPassword(
+          actorOf(request),
+          request.params.poolId,
+          request.params.userId,
+        ),
       ),
-    }),
+
+    unlockUser: async (request: Req<UserP>) =>
+      userJson(
+        await users.unlock(
+          actorOf(request),
+          request.params.poolId,
+          request.params.userId,
+        ),
+      ),
 
     changePassword: async (
       request: Req<UserP, Static<typeof ChangePasswordBody>>,

@@ -6,6 +6,7 @@ export interface AuditEvent {
   outcome: "success" | "denied" | "failure";
   actorType: "api_key" | "user" | "admin" | "operator" | "service";
   tenantId?: string;
+  poolId?: string;
   actorId?: string;
   resourceId?: string;
   requestId?: string;

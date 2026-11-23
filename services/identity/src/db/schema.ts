@@ -66,6 +66,9 @@ export const poolUsers = pgTable(
       .notNull(),
     failedLogins: integer("failed_logins").notNull().default(0),
     lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    passwordResetRequired: boolean("password_reset_required")
+      .notNull()
+      .default(false),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

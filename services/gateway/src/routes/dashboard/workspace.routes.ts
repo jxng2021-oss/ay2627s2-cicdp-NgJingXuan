@@ -117,7 +117,11 @@ export const workspaceRoutes: FastifyPluginCallback<DashboardOptions> = (
     const keys = apiKeysController(options);
     const secret = secretsController(secrets);
     const connections = connectionsController(options);
-    const audit = auditController(auditService, options.auditToken);
+    const audit = auditController(
+      auditService,
+      options.auditToken,
+      userPools.upstream,
+    );
     const bodyLimit = options.maxSecretBytes * 6 + 1024;
 
     api.get("", { schema: schemas.overviewSchema }, (request) =>
@@ -286,6 +290,16 @@ export const workspaceRoutes: FastifyPluginCallback<DashboardOptions> = (
       "/user-pools/:poolId/users/:userId/reset-password",
       { schema: schemas.resetPoolUserPasswordSchema, config: owner },
       poolsController.resetPoolUserPassword,
+    );
+    api.post(
+      "/user-pools/:poolId/users/:userId/unlock",
+      { schema: schemas.unlockPoolUserSchema, config: owner },
+      poolsController.unlockPoolUser,
+    );
+    api.get(
+      "/user-pools/:poolId/audit-events",
+      { schema: schemas.listPoolAuditEventsSchema },
+      audit.listPool,
     );
 
     const flagsController = dashboardFlagsController(flagService.forward);

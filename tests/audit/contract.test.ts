@@ -95,6 +95,38 @@ describe("the audit service meets the internal contract", () => {
     expectContract("GET", "/events", bad);
   });
 
+  it("GET /pools/{poolId}/events: 200 and 400", async () => {
+    const app = await startAudit();
+    const tenant = randomUUID();
+    const pool = randomUUID();
+    await sendEvent(app, "identity", {
+      action: "pool_user.logged_in",
+      outcome: "success",
+      actorType: "api_key",
+      tenantId: tenant,
+      poolId: pool,
+      resourceId: randomUUID(),
+    });
+    const read = (query: string) =>
+      app.inject({
+        method: "GET",
+        url: `/pools/${pool}/events${query}`,
+        headers: {
+          "x-audit-service": "gateway",
+          authorization: `Bearer ${TOKENS.gateway}`,
+          "x-tenant-id": tenant,
+        },
+      });
+
+    const ok = await read("?limit=10");
+    const bad = await read("?limit=0");
+
+    expect([ok.statusCode, bad.statusCode]).toEqual([200, 400]);
+    expect(ok.json<{ events: unknown[] }>().events).toHaveLength(1);
+    expectContract("GET", `/pools/${pool}/events`, ok);
+    expectContract("GET", `/pools/${pool}/events`, bad);
+  });
+
   it("GET /events/summary: 200 and 400", async () => {
     const app = await startAudit();
     const tenant = randomUUID();

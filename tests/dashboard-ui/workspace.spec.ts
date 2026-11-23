@@ -224,7 +224,7 @@ test("the overview's activity counts what happened, for the chosen range", async
 });
 
 test("user pools: create one, see how to connect, and delete it (confirmed)", async () => {
-  await openSection(page, "User pools");
+  await openSection(page, "Users");
   await expect(page.getByText("No user pools yet.")).toBeVisible();
 
   await page.getByRole("button", { name: "Create user pool" }).click();

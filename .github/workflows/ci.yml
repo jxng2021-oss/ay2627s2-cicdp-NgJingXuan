@@ -519,16 +519,22 @@ jobs:
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/home/ubuntu/secure-cloud' }}
           IMAGE_REPOSITORY: ${{ vars.ECR_REGISTRY }}/secure-cloud-platform
           AWS_REGION: ${{ vars.AWS_REGION }}
+          PROXY_ALLOWED_HOSTS: ${{ vars.PROXY_ALLOWED_HOSTS }}
         run: |
+          if [[ -n "$PROXY_ALLOWED_HOSTS" && ! "$PROXY_ALLOWED_HOSTS" =~ ^[a-z0-9.-]+(,[a-z0-9.-]+)*$ ]]; then
+            echo "::error::PROXY_ALLOWED_HOSTS must be host names separated by commas"
+            exit 1
+          fi
           parameters="$(jq -n \
             --arg dir "$DEPLOY_PATH" --arg sha "$GITHUB_SHA" --arg repo "$IMAGE_REPOSITORY" \
-            --arg region "$AWS_REGION" --arg domain "$DEPLOY_DOMAIN" '{
+            --arg region "$AWS_REGION" --arg domain "$DEPLOY_DOMAIN" \
+            --arg hosts "$PROXY_ALLOWED_HOSTS" '{
               commands: [
                 "set -eu",
                 "export PATH=\"$PATH:/snap/bin\"",
                 "sudo -u ubuntu git -C \($dir) fetch --quiet origin",
                 "sudo -u ubuntu git -C \($dir) checkout --quiet --detach \($sha)",
-                "AWS_REGION=\($region) IMAGE_REPOSITORY=\($repo) IMAGE_TAG=\($sha) bash \($dir)/deploy/deploy.sh \($domain)"
+                "PROXY_ALLOWED_HOSTS=\($hosts) AWS_REGION=\($region) IMAGE_REPOSITORY=\($repo) IMAGE_TAG=\($sha) bash \($dir)/deploy/deploy.sh \($domain)"
               ],
               executionTimeout: ["1500"]
             }')"

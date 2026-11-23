@@ -21,6 +21,7 @@ export const EventBody = Type.Object(
     outcome: literals(OUTCOMES),
     actorType: literals(ACTOR_TYPES),
     tenantId: Type.Optional(Type.String({ pattern: UUID })),
+    poolId: Type.Optional(Type.String({ pattern: UUID })),
     actorId: Type.Optional(Type.String({ pattern: UUID })),
     resourceId: Type.Optional(Type.String({ pattern: RESOURCE_ID })),
     requestId: Type.Optional(Type.String({ pattern: UUID })),
@@ -55,3 +56,9 @@ export const SummaryQuery = Type.Object(
   { additionalProperties: false },
 );
 export type SummaryQuery = Static<typeof SummaryQuery>;
+
+export const PoolParams = Type.Object(
+  { poolId: Type.String({ pattern: UUID }) },
+  { additionalProperties: false },
+);
+export type PoolParams = Static<typeof PoolParams>;

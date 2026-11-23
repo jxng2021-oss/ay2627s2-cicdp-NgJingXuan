@@ -34,12 +34,14 @@ export function auditEvent(
   action: string,
   outcome: AuditEvent["outcome"],
   resourceId?: string,
+  poolId?: string,
 ): AuditEvent {
   return {
     action,
     outcome,
     actorType: actor.actorId ? actor.actorType : "service",
     tenantId: actor.tenantId,
+    ...(poolId ? { poolId } : {}),
     ...(actor.actorId ? { actorId: actor.actorId } : {}),
     ...(resourceId ? { resourceId } : {}),
     requestId: actor.requestId,

@@ -1,7 +1,12 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { AuditRow } from "../db/schema.js";
 import { AppError } from "../errors.js";
-import type { EventBody, EventsQuery, SummaryQuery } from "../schemas.js";
+import type {
+  EventBody,
+  EventsQuery,
+  PoolParams,
+  SummaryQuery,
+} from "../schemas.js";
 import type { EventService } from "../services/event.service.js";
 
 const UUID_PATTERN =
@@ -35,6 +40,18 @@ function eventJson(row: AuditRow) {
   };
 }
 
+function eventQuery({ from, to, ...query }: EventsQuery) {
+  return {
+    ...query,
+    from: from === undefined ? undefined : new Date(from),
+    to: to === undefined ? undefined : new Date(to),
+  };
+}
+
+function pageJson(page: { events: AuditRow[]; nextCursor: string | null }) {
+  return { events: page.events.map(eventJson), nextCursor: page.nextCursor };
+}
+
 export function createEventController(events: EventService) {
   return {
     record: async (
@@ -45,19 +62,21 @@ export function createEventController(events: EventService) {
       return reply.code(201).send({ id: row.id, seq: row.seq });
     },
 
-    list: async (request: FastifyRequest<{ Querystring: EventsQuery }>) => {
-      const tenantId = gatewayTenant(request);
-      const { from, to, ...query } = request.query;
-      const page = await events.list(tenantId, {
-        ...query,
-        from: from === undefined ? undefined : new Date(from),
-        to: to === undefined ? undefined : new Date(to),
-      });
-      return {
-        events: page.events.map(eventJson),
-        nextCursor: page.nextCursor,
-      };
-    },
+    list: async (request: FastifyRequest<{ Querystring: EventsQuery }>) =>
+      pageJson(
+        await events.list(gatewayTenant(request), eventQuery(request.query)),
+      ),
+
+    listPool: async (
+      request: FastifyRequest<{ Params: PoolParams; Querystring: EventsQuery }>,
+    ) =>
+      pageJson(
+        await events.listPool(
+          gatewayTenant(request),
+          request.params.poolId,
+          eventQuery(request.query),
+        ),
+      ),
 
     summary: (request: FastifyRequest<{ Querystring: SummaryQuery }>) =>
       events.summary(

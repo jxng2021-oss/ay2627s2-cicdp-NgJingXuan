@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { beforeEach, describe, expect, it } from "vitest";
-import { TENANT_AUDIT_ACTIONS } from "../../services/gateway/src/api/audit-schemas.js";
+import { ACTIONS } from "../../services/audit/src/actions.js";
+import {
+  POOL_AUDIT_ACTIONS,
+  TENANT_AUDIT_ACTIONS,
+} from "../../services/gateway/src/api/audit-schemas.js";
 import { loadSpec } from "../../api/validate.js";
 import {
   auditContract,
@@ -286,7 +290,19 @@ describe("GET /v1/audit-events", () => {
         (action) => !platformOnly.includes(action),
       );
 
-    expect([...TENANT_AUDIT_ACTIONS].sort()).toEqual(tenantActions.sort());
+    const addedWithPoolChains = ["pool_user.unlocked"];
+    expect([...TENANT_AUDIT_ACTIONS].sort()).toEqual(
+      tenantActions
+        .filter((action) => !addedWithPoolChains.includes(action))
+        .sort(),
+    );
+  });
+
+  it("lists exactly the user pool actions of the audit service for pool logs", () => {
+    const poolActions = Object.entries(ACTIONS)
+      .filter(([, rule]) => rule.chain === "pool")
+      .map(([action]) => action);
+    expect([...POOL_AUDIT_ACTIONS].sort()).toEqual(poolActions.sort());
   });
 });
 

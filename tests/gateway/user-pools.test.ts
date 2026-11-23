@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { insertMembership } from "../../services/gateway/src/models/membership.model.js";
 import type { Database } from "../../services/gateway/src/db/client.js";
 import { expectPublicContract } from "./contract-helpers.js";
-import { Browser, fakeIdentity } from "./dashboard-helpers.js";
+import { Browser, fakeAuditEvents, fakeIdentity } from "./dashboard-helpers.js";
 import {
   createTestDatabase,
   createTenantWithKey,
@@ -15,14 +15,17 @@ import {
 let db: Database;
 let app: FastifyInstance;
 let identity: Awaited<ReturnType<typeof fakeIdentity>>;
+let auditService: Awaited<ReturnType<typeof fakeAuditEvents>>;
 
 beforeEach(async () => {
   ({ db } = await createTestDatabase());
   identity = await fakeIdentity();
+  auditService = await fakeAuditEvents();
   app = await startGateway({
     db,
     audit: new FakeAudit(),
     identityUrl: identity.url,
+    auditUrl: auditService.url,
   });
 });
 
@@ -187,6 +190,7 @@ describe("user pools in the dashboard", () => {
       ["PATCH", `/user-pools/${pool}/users/${user}`, { status: "disabled" }],
       ["DELETE", `/user-pools/${pool}/users/${user}`, undefined],
       ["POST", `/user-pools/${pool}/users/${user}/reset-password`, undefined],
+      ["POST", `/user-pools/${pool}/users/${user}/unlock`, undefined],
     ] as const) {
       expectError(
         await member.request(
@@ -203,7 +207,17 @@ describe("user pools in the dashboard", () => {
       "POST",
       owner.ws(workspace, `/user-pools/${pool}/users/${user}/reset-password`),
     );
-    expect(reset.json()).toEqual({ temporaryPassword: "t".repeat(24) });
+    expect(reset.json()).toMatchObject({ passwordResetRequired: true });
+    expect(reset.body).not.toContain("temporaryPassword");
+    const unlocked = await owner.request(
+      "POST",
+      owner.ws(workspace, `/user-pools/${pool}/users/${user}/unlock`),
+    );
+    expect(unlocked.statusCode).toBe(200);
+    expect(unlocked.json()).toMatchObject({ locked: false });
+    expect(identity.requests.at(-1)!.url).toBe(
+      `/pools/${pool}/users/${user}/unlock`,
+    );
     expect(
       (
         await owner.request(
@@ -213,6 +227,56 @@ describe("user pools in the dashboard", () => {
       ).statusCode,
     ).toBe(204);
     expect(identity.problems).toEqual([]);
+  });
+
+  it("members read a pool's own audit log; another workspace's pool is a 404", async () => {
+    const { owner, workspace, pool } = await workspaceWithPool();
+    const member = new Browser(app);
+    await member.signUp("member@example.com", "Member's own");
+    const me = await member.request("GET", "/dashboard/v1/auth/me");
+    await insertMembership(db, {
+      userId: me.json<{ user: { id: string } }>().user.id,
+      tenantId: workspace,
+      role: "member",
+    });
+
+    const read = await member.request(
+      "GET",
+      member.ws(
+        workspace,
+        `/user-pools/${pool}/audit-events?limit=10&action=pool_user.unlocked`,
+      ),
+    );
+    expect(read.statusCode).toBe(200);
+    expect(read.json()).toEqual({ events: [], nextCursor: null });
+    const sent = auditService.requests.at(-1)!;
+    expect(sent.url).toBe(
+      `/pools/${pool}/events?limit=10&action=pool_user.unlocked`,
+    );
+    expect(sent.headers["x-tenant-id"]).toBe(workspace);
+
+    const stranger = new Browser(app);
+    const theirs = await stranger.signUp("stranger@example.com", "Theirs");
+    expectError(
+      await stranger.request(
+        "GET",
+        stranger.ws(theirs, `/user-pools/${pool}/audit-events`),
+      ),
+      404,
+      "NOT_FOUND",
+    );
+    expectError(
+      await owner.request(
+        "GET",
+        owner.ws(
+          workspace,
+          "/user-pools/6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b/audit-events",
+        ),
+      ),
+      404,
+      "NOT_FOUND",
+    );
+    expect(auditService.problems).toEqual([]);
   });
 
   it("another workspace's member can't reach the pool (the same 404 as a missing workspace)", async () => {

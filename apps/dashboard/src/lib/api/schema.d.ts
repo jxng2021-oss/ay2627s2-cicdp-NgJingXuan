@@ -617,8 +617,42 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reset a user's password: a temporary password, shown once (owners only) */
+        /** Require a password reset: the user's sessions end and their next sign-in asks them to choose a new password (owners only) */
         post: operations["resetPoolUserPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/v1/workspaces/{workspaceId}/user-pools/{poolId}/users/{userId}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unlock a user locked after repeated wrong passwords (owners only) */
+        post: operations["unlockPoolUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/v1/workspaces/{workspaceId}/user-pools/{poolId}/audit-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A user pool's own audit log, newest first (separate from the workspace's) */
+        get: operations["listPoolAuditEvents"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -10011,6 +10045,7 @@ export interface operations {
                         /** @enum {unknown} */
                         status: "active" | "disabled";
                         locked: boolean;
+                        passwordResetRequired: boolean;
                         attributes: {
                             [key: string]: string | number | boolean;
                         };
@@ -10248,6 +10283,7 @@ export interface operations {
                         /** @enum {unknown} */
                         status: "active" | "disabled";
                         locked: boolean;
+                        passwordResetRequired: boolean;
                         attributes: {
                             [key: string]: string | number | boolean;
                         };
@@ -10488,6 +10524,7 @@ export interface operations {
                             /** @enum {unknown} */
                             status: "active" | "disabled";
                             locked: boolean;
+                            passwordResetRequired: boolean;
                             attributes: {
                                 [key: string]: string | number | boolean;
                             };
@@ -10697,6 +10734,7 @@ export interface operations {
                         /** @enum {unknown} */
                         status: "active" | "disabled";
                         locked: boolean;
+                        passwordResetRequired: boolean;
                         attributes: {
                             [key: string]: string | number | boolean;
                         };
@@ -11131,6 +11169,7 @@ export interface operations {
                         /** @enum {unknown} */
                         status: "active" | "disabled";
                         locked: boolean;
+                        passwordResetRequired: boolean;
                         attributes: {
                             [key: string]: string | number | boolean;
                         };
@@ -11353,14 +11392,28 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The temporary password. Give it to the user; it isn't shown again. */
+            /** @description The user, with passwordResetRequired */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        temporaryPassword: string;
+                        /** Format: uuid */
+                        id: string;
+                        email: string;
+                        /** @enum {unknown} */
+                        status: "active" | "disabled";
+                        locked: boolean;
+                        passwordResetRequired: boolean;
+                        attributes: {
+                            [key: string]: string | number | boolean;
+                        };
+                        roles: string[];
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        lastLoginAt: string | null;
                     };
                 };
             };
@@ -11433,6 +11486,486 @@ export interface operations {
                      *       "error": {
                      *         "code": "FORBIDDEN",
                      *         "message": "Only workspace owners can do this",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description NOT_FOUND: no such workspace, pool or user (or you aren't a member). */
+            404: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "NOT_FOUND",
+                     *         "message": "User pool not found",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description CONFLICT: the workspace is being deleted (crypto-shredded). Only finishing the deletion is possible. */
+            409: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "CONFLICT",
+                     *         "message": "This workspace is being deleted",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description UPSTREAM_UNAVAILABLE: the identity service can't be reached. */
+            502: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "UPSTREAM_UNAVAILABLE",
+                     *         "message": "Identity service is unavailable",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description SECRETS_SEALED: creating a pool needs the vault unsealed. SERVICE_UNAVAILABLE: the audit log is unavailable (changes are refused). */
+            503: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "SECRETS_SEALED",
+                     *         "message": "The secrets service is sealed until an operator unseals it",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    unlockPoolUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: string;
+                poolId: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The user, no longer locked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        email: string;
+                        /** @enum {unknown} */
+                        status: "active" | "disabled";
+                        locked: boolean;
+                        passwordResetRequired: boolean;
+                        attributes: {
+                            [key: string]: string | number | boolean;
+                        };
+                        roles: string[];
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        lastLoginAt: string | null;
+                    };
+                };
+            };
+            /** @description BAD_REQUEST: invalid input. */
+            400: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "BAD_REQUEST",
+                     *         "message": "Invalid input",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description UNAUTHORIZED: not signed in, or the session expired. */
+            401: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "UNAUTHORIZED",
+                     *         "message": "Sign in first",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description FORBIDDEN: only workspace owners can do this (or a CSRF/Origin problem). */
+            403: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "FORBIDDEN",
+                     *         "message": "Only workspace owners can do this",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description NOT_FOUND: no such workspace, pool or user (or you aren't a member). */
+            404: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "NOT_FOUND",
+                     *         "message": "User pool not found",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description CONFLICT: the workspace is being deleted (crypto-shredded). Only finishing the deletion is possible. */
+            409: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "CONFLICT",
+                     *         "message": "This workspace is being deleted",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description UPSTREAM_UNAVAILABLE: the identity service can't be reached. */
+            502: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "UPSTREAM_UNAVAILABLE",
+                     *         "message": "Identity service is unavailable",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description SECRETS_SEALED: creating a pool needs the vault unsealed. SERVICE_UNAVAILABLE: the audit log is unavailable (changes are refused). */
+            503: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "SECRETS_SEALED",
+                     *         "message": "The secrets service is sealed until an operator unseals it",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    listPoolAuditEvents: {
+        parameters: {
+            query?: {
+                /** @description Only events at or after this time (ISO 8601) */
+                from?: string;
+                /** @description Only events before this time (ISO 8601) */
+                to?: string;
+                /** @description What happened */
+                action?: "pool_user.signed_up" | "pool_user.updated" | "pool_user.deleted" | "pool_user.password_reset" | "pool_user.password_changed" | "pool_user.logged_in" | "pool_user.login_failed" | "pool_user.logged_out" | "pool_user.token_reused" | "pool_user.unlocked" | "pool_role.created" | "pool_role.updated" | "pool_role.deleted" | "pool_user.role_added" | "pool_user.role_removed";
+                /** @description success; denied (e.g. a proxy target that isn't allowed); failure */
+                outcome?: "success" | "denied" | "failure";
+                resourceType?: "pool_user" | "pool_role";
+                /** @description e.g. a file ID or a secret's name */
+                resourceId?: string;
+                /** @description Page size (1-100, default 50) */
+                limit?: number;
+                /** @description `nextCursor` from the previous page */
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                workspaceId: string;
+                poolId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        events: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: date-time */
+                            occurredAt: string;
+                            /**
+                             * @description Who did it: one of your API keys, a dashboard user, a platform administrator, or a platform service
+                             * @enum {unknown}
+                             */
+                            actorType: "api_key" | "user" | "admin" | "operator" | "service";
+                            /** @description The API key's or dashboard user's ID (never a key, password or token), if any */
+                            actorId: string | null;
+                            /**
+                             * @description What happened
+                             * @enum {unknown}
+                             */
+                            action: "pool_user.signed_up" | "pool_user.updated" | "pool_user.deleted" | "pool_user.password_reset" | "pool_user.password_changed" | "pool_user.logged_in" | "pool_user.login_failed" | "pool_user.logged_out" | "pool_user.token_reused" | "pool_user.unlocked" | "pool_role.created" | "pool_role.updated" | "pool_role.deleted" | "pool_user.role_added" | "pool_user.role_removed";
+                            /** @enum {unknown} */
+                            resourceType: "pool_user" | "pool_role";
+                            /** @description The file ID, secret name, key ID, connection name... */
+                            resourceId: string | null;
+                            /**
+                             * @description success; denied (e.g. a proxy target that isn't allowed); failure
+                             * @enum {unknown}
+                             */
+                            outcome: "success" | "denied" | "failure";
+                            /**
+                             * Format: uuid
+                             * @description The X-Request-Id of the request that caused it
+                             */
+                            requestId: string | null;
+                            /** @description The client's IP address, as the gateway saw it */
+                            sourceIp: string | null;
+                        }[];
+                        /** @description Pass as `cursor` to get the next page; null when there are no more. */
+                        nextCursor: string | null;
+                    };
+                };
+            };
+            /** @description BAD_REQUEST: invalid input. */
+            400: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "BAD_REQUEST",
+                     *         "message": "Invalid input",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description UNAUTHORIZED: not signed in, or the session expired. */
+            401: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "UNAUTHORIZED",
+                     *         "message": "Sign in first",
                      *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
                      *       }
                      *     }

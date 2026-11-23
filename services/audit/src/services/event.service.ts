@@ -2,6 +2,7 @@ import { isIP } from "node:net";
 import {
   ACTIONS,
   PLATFORM_CHAIN,
+  poolChain,
   type Action,
   type ActionRule,
   type ServiceName,
@@ -41,8 +42,19 @@ export function createEventService(db: Database, hmacKey: string) {
           "FORBIDDEN",
           "This service may not record that action",
         );
-      if (rule.chain === "tenant" && event.tenantId === undefined)
+      if (
+        (rule.chain === "tenant" || rule.chain === "pool") &&
+        event.tenantId === undefined
+      )
         throw new AppError(400, "BAD_REQUEST", "This action needs a tenantId");
+      if (rule.chain === "pool" && event.poolId === undefined)
+        throw new AppError(400, "BAD_REQUEST", "This action needs a poolId");
+      if (rule.chain !== "pool" && event.poolId !== undefined)
+        throw new AppError(
+          400,
+          "BAD_REQUEST",
+          "Only user pool actions take a poolId",
+        );
       if (event.sourceIp !== undefined && isIP(event.sourceIp) === 0)
         throw new AppError(
           400,
@@ -50,10 +62,7 @@ export function createEventService(db: Database, hmacKey: string) {
           "sourceIp must be an IP address",
         );
       return appendEvent(db, hmacKey, {
-        chain:
-          rule.chain === "platform" || event.tenantId === undefined
-            ? PLATFORM_CHAIN
-            : event.tenantId,
+        chain: chainOf(rule, event),
         tenantId: event.tenantId ?? null,
         service: caller,
         actorType: event.actorType,
@@ -67,30 +76,12 @@ export function createEventService(db: Database, hmacKey: string) {
       });
     },
 
-    async list(tenantId: string, query: EventQuery) {
-      const { from, to, cursor, limit = 50, ...filters } = query;
-      if (Number.isNaN(from?.getTime()) || Number.isNaN(to?.getTime()))
-        throw new AppError(
-          400,
-          "BAD_REQUEST",
-          "from and to must be valid timestamps",
-        );
-      const rows = await listEvents(
-        db,
-        tenantId,
-        {
-          ...filters,
-          from,
-          to,
-          beforeSeq: cursor === undefined ? undefined : Number(cursor),
-        },
-        limit + 1,
-      );
-      const page = rows.slice(0, limit);
-      return {
-        events: page,
-        nextCursor: rows.length > limit ? String(page.at(-1)!.seq) : null,
-      };
+    list(tenantId: string, query: EventQuery) {
+      return listChain(tenantId, tenantId, query);
+    },
+
+    listPool(tenantId: string, poolId: string, query: EventQuery) {
+      return listChain(poolChain(poolId), tenantId, query);
     },
 
     summary(tenantId: string, from: Date, to: Date) {
@@ -104,4 +95,38 @@ export function createEventService(db: Database, hmacKey: string) {
       return summarizeEvents(db, tenantId, from, to);
     },
   };
+
+  async function listChain(chain: string, tenantId: string, query: EventQuery) {
+    const { from, to, cursor, limit = 50, ...filters } = query;
+    if (Number.isNaN(from?.getTime()) || Number.isNaN(to?.getTime()))
+      throw new AppError(
+        400,
+        "BAD_REQUEST",
+        "from and to must be valid timestamps",
+      );
+    const rows = await listEvents(
+      db,
+      chain,
+      {
+        ...filters,
+        tenantId,
+        from,
+        to,
+        beforeSeq: cursor === undefined ? undefined : Number(cursor),
+      },
+      limit + 1,
+    );
+    const page = rows.slice(0, limit);
+    return {
+      events: page,
+      nextCursor: rows.length > limit ? String(page.at(-1)!.seq) : null,
+    };
+  }
+}
+
+function chainOf(rule: ActionRule, event: EventBody): string {
+  if (rule.chain === "pool" && event.poolId) return poolChain(event.poolId);
+  if (rule.chain === "platform" || event.tenantId === undefined)
+    return PLATFORM_CHAIN;
+  return event.tenantId;
 }

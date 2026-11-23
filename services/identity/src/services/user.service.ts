@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import type { PoolUser } from "../db/schema.js";
 import { AppError } from "../errors.js";
 import {
@@ -71,7 +70,13 @@ export function createUserService(deps: IdentityDeps) {
             attributes: input.attributes ?? {},
           }),
         (saved) =>
-          auditEvent(actor, "pool_user.signed_up", "success", saved.id),
+          auditEvent(
+            actor,
+            "pool_user.signed_up",
+            "success",
+            saved.id,
+            pool.id,
+          ),
       );
       if (!user)
         throw new AppError(
@@ -128,7 +133,8 @@ export function createUserService(deps: IdentityDeps) {
           }
           return changed;
         },
-        (saved) => auditEvent(actor, "pool_user.updated", "success", saved.id),
+        (saved) =>
+          auditEvent(actor, "pool_user.updated", "success", saved.id, pool.id),
       );
       if (!user) throw userNotFound();
       return withRoles(user);
@@ -140,7 +146,7 @@ export function createUserService(deps: IdentityDeps) {
         actor,
         async (tx) =>
           (await deleteUser(tx, pool.id, userId)) ? userId : undefined,
-        (id) => auditEvent(actor, "pool_user.deleted", "success", id),
+        (id) => auditEvent(actor, "pool_user.deleted", "success", id, pool.id),
       );
       if (!deleted) throw userNotFound();
     },
@@ -149,26 +155,48 @@ export function createUserService(deps: IdentityDeps) {
       actor: Actor,
       poolId: string,
       userId: string,
-    ): Promise<string> {
+    ): Promise<UserWithRoles> {
       const pool = await poolOf(db, actor, poolId);
-      const temporaryPassword = randomBytes(18).toString("base64url");
-      const passwordHash = await hashPassword(temporaryPassword);
       const user = await recorded(
         actor,
         async (tx) => {
           const changed = await updateUser(tx, pool.id, userId, {
-            passwordHash,
-            failedLogins: 0,
-            lockedUntil: null,
+            passwordResetRequired: true,
           });
           if (changed) await revokeUserSessions(tx, changed.id);
           return changed;
         },
         (saved) =>
-          auditEvent(actor, "pool_user.password_reset", "success", saved.id),
+          auditEvent(
+            actor,
+            "pool_user.password_reset",
+            "success",
+            saved.id,
+            pool.id,
+          ),
       );
       if (!user) throw userNotFound();
-      return temporaryPassword;
+      return withRoles(user);
+    },
+
+    async unlock(
+      actor: Actor,
+      poolId: string,
+      userId: string,
+    ): Promise<UserWithRoles> {
+      const pool = await poolOf(db, actor, poolId);
+      const user = await recorded(
+        actor,
+        (tx) =>
+          updateUser(tx, pool.id, userId, {
+            failedLogins: 0,
+            lockedUntil: null,
+          }),
+        (saved) =>
+          auditEvent(actor, "pool_user.unlocked", "success", saved.id, pool.id),
+      );
+      if (!user) throw userNotFound();
+      return withRoles(user);
     },
 
     async changePassword(
@@ -194,12 +222,19 @@ export function createUserService(deps: IdentityDeps) {
         async (tx) => {
           const changed = await updateUser(tx, pool.id, user.id, {
             passwordHash,
+            passwordResetRequired: false,
           });
           await revokeUserSessions(tx, user.id);
           return changed;
         },
         (saved) =>
-          auditEvent(actor, "pool_user.password_changed", "success", saved.id),
+          auditEvent(
+            actor,
+            "pool_user.password_changed",
+            "success",
+            saved.id,
+            pool.id,
+          ),
       );
     },
   };

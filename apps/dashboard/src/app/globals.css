@@ -740,7 +740,40 @@ code,
   font-weight: 600;
   text-decoration: none;
 }
-.nav a:hover {
+.nav-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 36px;
+  padding: 4px var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--sidebar-foreground);
+  font: inherit;
+  font-size: var(--text-label);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.nav-caret {
+  display: inline-grid;
+  place-items: center;
+  margin-left: auto;
+  transition: transform var(--duration-state) var(--ease-out);
+}
+.nav-toggle[aria-expanded="true"] .nav-caret {
+  transform: rotate(180deg);
+}
+.nav .nav-sub {
+  padding-left: var(--space-8);
+}
+.nav .nav-sub[hidden] {
+  display: none;
+}
+.nav a:hover,
+.nav-toggle:hover {
   background: var(--surface-2);
   color: var(--foreground);
 }

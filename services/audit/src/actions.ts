@@ -9,7 +9,7 @@ export type ServiceName = (typeof SERVICES)[number];
 
 export interface ActionRule {
   resourceType: string;
-  chain: "tenant" | "platform" | "tenant-or-platform";
+  chain: "tenant" | "platform" | "tenant-or-platform" | "pool";
   sentBy: ServiceName;
 }
 
@@ -174,72 +174,77 @@ export const ACTIONS = {
   },
   "pool_user.signed_up": {
     resourceType: "pool_user",
-    chain: "tenant",
+    chain: "pool",
     sentBy: "identity",
   },
   "pool_user.updated": {
     resourceType: "pool_user",
-    chain: "tenant",
+    chain: "pool",
     sentBy: "identity",
   },
   "pool_user.deleted": {
     resourceType: "pool_user",
-    chain: "tenant",
+    chain: "pool",
     sentBy: "identity",
   },
   "pool_user.password_reset": {
     resourceType: "pool_user",
-    chain: "tenant",
+    chain: "pool",
     sentBy: "identity",
   },
   "pool_user.password_changed": {
     resourceType: "pool_user",
-    chain: "tenant",
+    chain: "pool",
     sentBy: "identity",
   },
   "pool_user.logged_in": {
     resourceType: "pool_user",
-    chain: "tenant",
+    chain: "pool",
     sentBy: "identity",
   },
   "pool_user.login_failed": {
     resourceType: "pool_user",
-    chain: "tenant",
+    chain: "pool",
     sentBy: "identity",
   },
   "pool_user.logged_out": {
     resourceType: "pool_user",
-    chain: "tenant",
+    chain: "pool",
     sentBy: "identity",
   },
   "pool_user.token_reused": {
     resourceType: "pool_user",
-    chain: "tenant",
+    chain: "pool",
     sentBy: "identity",
   },
   "pool_role.created": {
     resourceType: "pool_role",
-    chain: "tenant",
+    chain: "pool",
     sentBy: "identity",
   },
   "pool_role.updated": {
     resourceType: "pool_role",
-    chain: "tenant",
+    chain: "pool",
     sentBy: "identity",
   },
   "pool_role.deleted": {
     resourceType: "pool_role",
-    chain: "tenant",
+    chain: "pool",
     sentBy: "identity",
   },
   "pool_user.role_added": {
     resourceType: "pool_user",
-    chain: "tenant",
+    chain: "pool",
     sentBy: "identity",
   },
   "pool_user.role_removed": {
     resourceType: "pool_user",
-    chain: "tenant",
+    chain: "pool",
+    sentBy: "identity",
+  },
+  "pool_user.unlocked": {
+    resourceType: "pool_user",
+    chain: "pool",
     sentBy: "identity",
   },
   "feature_flag.created": {
@@ -285,3 +290,5 @@ export const ACTOR_TYPES = [
 export const OUTCOMES = ["success", "denied", "failure"] as const;
 
 export const PLATFORM_CHAIN = "platform";
+
+export const poolChain = (poolId: string) => `pool:${poolId}`;
