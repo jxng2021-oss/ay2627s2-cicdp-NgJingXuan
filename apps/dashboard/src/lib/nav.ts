@@ -1,11 +1,15 @@
 import type { IconName } from "@/components/icons";
 import type { FeatureId } from "./features";
 
-export interface NavItem {
+export interface NavLink {
   path: string;
   label: string;
+}
+
+export interface NavItem extends NavLink {
   icon: IconName;
   feature?: FeatureId;
+  children?: NavLink[];
 }
 
 export interface NavGroup {
@@ -44,6 +48,10 @@ export const WORKSPACE_NAV: NavGroup[] = [
         label: "User pools",
         icon: "users",
         feature: "pools",
+        children: [
+          { path: "/user-pools", label: "Users" },
+          { path: "/user-logs", label: "User logs" },
+        ],
       },
       {
         path: "/flags",

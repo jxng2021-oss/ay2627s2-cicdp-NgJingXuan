@@ -8,6 +8,7 @@ export interface PoolUser {
   email: string;
   status: "active" | "disabled";
   locked: boolean;
+  passwordResetRequired: boolean;
   attributes: Record<string, string | number | boolean>;
   roles: string[];
   createdAt: string;
@@ -28,6 +29,7 @@ export interface Session {
   tokenType: "Bearer";
   expiresIn: number;
   refreshToken: string;
+  passwordResetRequired: boolean;
   user: PoolUser;
 }
 

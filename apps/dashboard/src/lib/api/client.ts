@@ -231,3 +231,9 @@ export type FlagSettings = Flag["environments"]["production"];
 export type FlagEvaluation = Json<`${W}/flags/evaluate`, "post", 200>;
 export type AuditList = Json<`${W}/audit-events`, "get", 200>;
 export type AuditEvent = AuditList["events"][number];
+export type PoolAuditList = Json<
+  `${W}/user-pools/{poolId}/audit-events`,
+  "get",
+  200
+>;
+export type PoolAuditEvent = PoolAuditList["events"][number];

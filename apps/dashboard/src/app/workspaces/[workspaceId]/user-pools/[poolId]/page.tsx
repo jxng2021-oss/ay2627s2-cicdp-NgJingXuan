@@ -16,10 +16,10 @@ import {
   PageHeader,
   Pager,
   ShortValue,
-  Status,
   formatDate,
 } from "@/components/ui";
 import { PoolRoles } from "@/components/pool-roles";
+import { PoolUserStatus } from "@/components/pool-user-status";
 import { ApiError } from "@/lib/api/client";
 import { workspace as api } from "@/lib/api/endpoints";
 import { useToast } from "@/lib/toast";
@@ -171,16 +171,7 @@ Authorization: Bearer <your API key>
                       <tr key={user.id}>
                         <td data-label="Email">{user.email}</td>
                         <td data-label="Status">
-                          <span className="row">
-                            {user.status === "active" ? (
-                              <Status tone="success">Active</Status>
-                            ) : (
-                              <Status tone="warning">Disabled</Status>
-                            )}
-                            {user.locked && (
-                              <Status tone="danger">Locked</Status>
-                            )}
-                          </span>
+                          <PoolUserStatus user={user} />
                         </td>
                         <td data-label="Last sign in">
                           {formatDate(user.lastLoginAt)}

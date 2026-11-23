@@ -1508,7 +1508,7 @@
     },
     "/pools/{poolId}/users/{userId}/reset-password": {
       "post": {
-        "summary": "An owner resets a user's password: a random temporary password, returned once",
+        "summary": "An owner requires a password reset: the user keeps their password, every session ends, and the next sign-in says passwordResetRequired",
         "parameters": [
           {
             "name": "X-Tenant-Id",
@@ -1580,19 +1580,147 @@
         ],
         "responses": {
           "200": {
-            "description": "Done",
+            "description": "The user, with passwordResetRequired true",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": ["temporaryPassword"],
-                  "additionalProperties": false,
-                  "properties": {
-                    "temporaryPassword": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9_-]{24}$"
-                    }
-                  }
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Always no-store: answers may hold tokens",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "enum": ["no-store"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: invalid input or X-Tenant-Id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: not from the internal network",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: shutting down, or the audit log is down (changes are refused)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: no such pool or user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pools/{poolId}/users/{userId}/unlock": {
+      "post": {
+        "summary": "An owner unlocks a user locked after repeated wrong passwords",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "required": true,
+            "description": "Tenant verified by the gateway (from the API key or the dashboard membership). The only source of the tenant.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "description": "The gateway's request ID, used in this service's logs and errors",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Actor-Id",
+            "in": "header",
+            "required": false,
+            "description": "The verified API key's or dashboard user's ID, for the audit log only. Ignored unless a UUID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Actor-Type",
+            "in": "header",
+            "required": false,
+            "description": "Whose ID X-Actor-Id is: api_key (default) or user. For the audit log only.",
+            "schema": {
+              "type": "string",
+              "enum": ["api_key", "user"]
+            }
+          },
+          {
+            "name": "X-Client-Ip",
+            "in": "header",
+            "required": false,
+            "description": "The client's IP address as the gateway saw it, for the audit log only.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "poolId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The user, no longer locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
                 }
               }
             },
@@ -3529,7 +3657,8 @@
           "attributes",
           "roles",
           "createdAt",
-          "lastLoginAt"
+          "lastLoginAt",
+          "passwordResetRequired"
         ],
         "additionalProperties": false,
         "properties": {
@@ -3547,6 +3676,10 @@
           "locked": {
             "type": "boolean",
             "description": "Locked after repeated wrong passwords"
+          },
+          "passwordResetRequired": {
+            "type": "boolean",
+            "description": "An owner reset the password: the user must choose a new one (POST /pools/{poolId}/users/{userId}/password clears it)"
           },
           "attributes": {
             "type": "object",
@@ -3611,7 +3744,8 @@
           "tokenType",
           "expiresIn",
           "refreshToken",
-          "user"
+          "user",
+          "passwordResetRequired"
         ],
         "additionalProperties": false,
         "properties": {
@@ -3630,6 +3764,10 @@
           "refreshToken": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "passwordResetRequired": {
+            "type": "boolean",
+            "description": "True when an owner reset the user's password: the app must send them to choose a new one before anything else"
           },
           "user": {
             "$ref": "#/components/schemas/User"

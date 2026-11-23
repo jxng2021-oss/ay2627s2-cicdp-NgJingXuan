@@ -61,6 +61,8 @@
     "local:secrets:unseal": "node scripts/local-secrets.ts unseal",
     "local:secrets:status": "node scripts/local-secrets.ts status",
     "demo:setup": "node scripts/demo-shop-setup.ts",
+    "demo:start": "node scripts/demo-shop.ts",
+    "demo:stop": "node scripts/demo-shop.ts stop",
     "e2e:start": "node scripts/e2e-compose.ts up --build --detach --wait --wait-timeout 180",
     "stack:up": "node scripts/e2e-compose.ts up --detach --wait --wait-timeout 180",
     "stack:down": "docker compose down --volumes",

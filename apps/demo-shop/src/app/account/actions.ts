@@ -3,12 +3,13 @@
 import { redirect } from "next/navigation";
 import { describeError, type ErrorView } from "@/lib/messages";
 import {
+  changeShopperPassword,
   PlatformError,
   signInShopper,
   signOutShopper,
   signUpShopper,
 } from "@/lib/platform/client";
-import { clearTokens, saveTokens } from "@/lib/shoppers";
+import { clearTokens, currentShopper, saveTokens } from "@/lib/shoppers";
 
 export interface AccountState {
   error?: ErrorView;
@@ -35,8 +36,11 @@ export async function signIn(
   form: FormData,
 ): Promise<AccountState> {
   const { email, password } = fields(form);
+  let resetRequired: boolean;
   try {
-    await saveTokens(await signInShopper(email, password));
+    const tokens = await signInShopper(email, password);
+    await saveTokens(tokens);
+    resetRequired = tokens.passwordResetRequired;
   } catch (error) {
     if (error instanceof PlatformError && error.status === 401) {
       return {
@@ -58,7 +62,55 @@ export async function signIn(
     }
     return { email, error: describeError(error) };
   }
+  if (resetRequired) redirect("/account/new-password");
   redirect(safeNext(form.get("next")));
+}
+
+export async function choosePassword(
+  _previous: AccountState,
+  form: FormData,
+): Promise<AccountState> {
+  const shopper = await currentShopper();
+  if (!shopper) redirect("/account/sign-in");
+  const text = (name: string) => {
+    const value = form.get(name);
+    return typeof value === "string" ? value : "";
+  };
+  const current = text("currentPassword");
+  const next = text("newPassword");
+  if (next !== text("confirmPassword")) {
+    return {
+      error: {
+        title: "Passwords don't match",
+        message: "Type the same new password twice.",
+      },
+    };
+  }
+  try {
+    await changeShopperPassword(shopper.id, current, next);
+    await saveTokens(await signInShopper(shopper.email, next));
+  } catch (error) {
+    if (error instanceof PlatformError && error.status === 401) {
+      return {
+        error: {
+          title: "Wrong current password",
+          message: "Enter the password you just signed in with.",
+        },
+      };
+    }
+    if (error instanceof PlatformError && error.status === 400) {
+      return {
+        error: {
+          title: "Choose another password",
+          message: error.message.startsWith("body/")
+            ? "Use at least 12 characters."
+            : error.message,
+        },
+      };
+    }
+    return { error: describeError(error) };
+  }
+  redirect("/account/orders");
 }
 
 export async function signUp(

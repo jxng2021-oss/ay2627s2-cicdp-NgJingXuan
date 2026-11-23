@@ -15,6 +15,13 @@
       "when": 1794833868636,
       "tag": "0001_user_pool_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795405088664,
+      "tag": "0002_pool_user_password_reset",
+      "breakpoints": true
     }
   ]
 }

@@ -56,6 +56,7 @@ app.post("/sign-in", async (req, res) => {
   const cookie = { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production" };
   res.cookie("access_token", session.accessToken, { ...cookie, maxAge: session.expiresIn * 1000 });
   res.cookie("refresh_token", session.refreshToken, { ...cookie, maxAge: 7 * 24 * 60 * 60 * 1000 });
+  if (session.passwordResetRequired) return res.redirect("/choose-a-new-password");
   res.json({ email: session.user.email });
 });
 `}</Code>
@@ -76,6 +77,11 @@ app.post("/sign-in", async (req, res) => {
             "string",
             "Gets new tokens with refresh(). It works once.",
           ],
+          [
+            "passwordResetRequired",
+            "boolean",
+            "True after an owner reset the password: send the user to choose a new one with changePassword() first.",
+          ],
           ["user", "object", "The user: id, email, status, attributes."],
         ]}
       />
@@ -83,7 +89,7 @@ app.post("/sign-in", async (req, res) => {
         A wrong email and a wrong password get the same{" "}
         <code>UNAUTHORIZED</code> error, so nobody can find out which emails
         have accounts. After 5 wrong passwords in a row the user is locked for
-        15 minutes.
+        15 minutes, unless a workspace owner unlocks them sooner.
       </Note>
 
       <h2 className="heading-5">Protect a route</h2>
@@ -160,7 +166,7 @@ app.post("/sign-out", async (req, res) => {
           [
             "changePassword(userId, { currentPassword, newPassword })",
             "nothing",
-            "Changes a password and ends the user's other sessions.",
+            "Changes a password, ends the user's other sessions and clears passwordResetRequired.",
           ],
           [
             "listRoles(), createRole(), addRole() and more",

@@ -222,7 +222,12 @@ export async function updateUser(
   changes: Partial<
     Pick<
       PoolUser,
-      "status" | "attributes" | "passwordHash" | "failedLogins" | "lockedUntil"
+      | "status"
+      | "attributes"
+      | "passwordHash"
+      | "failedLogins"
+      | "lockedUntil"
+      | "passwordResetRequired"
     >
   >,
 ): Promise<PoolUser | undefined> {

@@ -51,11 +51,20 @@ export async function logIn(
 
 export const errorBanner = (page: Page) => page.locator(".banner[role=alert]");
 
+const NAV_MENUS: Record<string, string> = {
+  Users: "User pools",
+  "User logs": "User pools",
+};
+
 export async function openSection(page: Page, label: string): Promise<void> {
-  await page
-    .getByRole("navigation", { name: "Workspace" })
-    .getByRole("link", { name: label })
-    .click();
+  const nav = page.getByRole("navigation", { name: "Workspace" });
+  const menu = NAV_MENUS[label];
+  if (menu) {
+    const toggle = nav.getByRole("button", { name: menu });
+    if ((await toggle.getAttribute("aria-expanded")) !== "true")
+      await toggle.click();
+  }
+  await nav.getByRole("link", { name: label, exact: true }).click();
 }
 
 export async function openAccountMenu(page: Page): Promise<void> {

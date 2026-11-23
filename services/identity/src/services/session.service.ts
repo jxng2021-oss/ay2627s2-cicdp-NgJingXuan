@@ -114,10 +114,11 @@ export function createSessionService(deps: IdentityDeps) {
     actor: Actor,
     action: string,
     outcome: "success" | "denied",
+    poolId: string,
     resourceId?: string,
   ) =>
     void audit.recordBestEffort(
-      auditEvent(actor, action, outcome, resourceId),
+      auditEvent(actor, action, outcome, resourceId, poolId),
       actor.log,
     );
 
@@ -126,7 +127,13 @@ export function createSessionService(deps: IdentityDeps) {
       const pool = await poolOf(db, actor, poolId);
       const user = await findUserByEmail(db, pool.id, normalizeEmail(email));
       const failed = (resourceId?: string) => {
-        bestEffort(actor, "pool_user.login_failed", "denied", resourceId);
+        bestEffort(
+          actor,
+          "pool_user.login_failed",
+          "denied",
+          pool.id,
+          resourceId,
+        );
         return wrongLogin();
       };
       if (!user) {
@@ -149,7 +156,7 @@ export function createSessionService(deps: IdentityDeps) {
       }
       const tokens = await issueTokens(actor, pool, user);
       await recordLogin(db, user.id);
-      bestEffort(actor, "pool_user.logged_in", "success", user.id);
+      bestEffort(actor, "pool_user.logged_in", "success", pool.id, user.id);
       return tokens;
     },
 
@@ -165,7 +172,13 @@ export function createSessionService(deps: IdentityDeps) {
           { sessionId: session.id },
           "a replaced refresh token was used again; the session was revoked",
         );
-        bestEffort(actor, "pool_user.token_reused", "denied", session.userId);
+        bestEffort(
+          actor,
+          "pool_user.token_reused",
+          "denied",
+          pool.id,
+          session.userId,
+        );
         throw badRefresh();
       }
       if (session.revoked || found.used || session.expiresAt.getTime() <= now())
@@ -197,7 +210,13 @@ export function createSessionService(deps: IdentityDeps) {
       const session = found?.session;
       if (session && !session.revoked) {
         await revokeSession(db, session.id);
-        bestEffort(actor, "pool_user.logged_out", "success", session.userId);
+        bestEffort(
+          actor,
+          "pool_user.logged_out",
+          "success",
+          pool.id,
+          session.userId,
+        );
       }
     },
   };

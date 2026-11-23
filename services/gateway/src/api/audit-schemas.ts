@@ -158,6 +158,59 @@ const AuditEvent = Type.Object(
   { additionalProperties: false },
 );
 
+export const POOL_AUDIT_ACTIONS = [
+  "pool_user.signed_up",
+  "pool_user.updated",
+  "pool_user.deleted",
+  "pool_user.password_reset",
+  "pool_user.password_changed",
+  "pool_user.logged_in",
+  "pool_user.login_failed",
+  "pool_user.logged_out",
+  "pool_user.token_reused",
+  "pool_user.unlocked",
+  "pool_role.created",
+  "pool_role.updated",
+  "pool_role.deleted",
+  "pool_user.role_added",
+  "pool_user.role_removed",
+] as const;
+const POOL_RESOURCE_TYPES = ["pool_user", "pool_role"] as const;
+
+export const PoolAuditEventsQuery = Type.Object(
+  {
+    ...AuditEventsQuery.properties,
+    action: Type.Optional(
+      Type.Enum([...POOL_AUDIT_ACTIONS], { description: "What happened" }),
+    ),
+    resourceType: Type.Optional(Type.Enum([...POOL_RESOURCE_TYPES])),
+  },
+  { additionalProperties: false },
+);
+
+export const PoolAuditPage = Type.Object(
+  {
+    events: Type.Array(
+      Type.Object(
+        {
+          ...AuditEvent.properties,
+          action: Type.Enum([...POOL_AUDIT_ACTIONS], {
+            description: "What happened",
+          }),
+          resourceType: Type.Enum([...POOL_RESOURCE_TYPES]),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    nextCursor: Type.String({
+      nullable: true,
+      description:
+        "Pass as `cursor` to get the next page; null when there are no more.",
+    }),
+  },
+  { additionalProperties: false },
+);
+
 export const listAuditEventsSchema = {
   operationId: "listAuditEvents",
   tags: ["Audit"],

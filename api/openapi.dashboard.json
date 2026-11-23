@@ -18922,6 +18922,7 @@
                     "email",
                     "status",
                     "locked",
+                    "passwordResetRequired",
                     "attributes",
                     "roles",
                     "createdAt",
@@ -18942,6 +18943,9 @@
                       ]
                     },
                     "locked": {
+                      "type": "boolean"
+                    },
+                    "passwordResetRequired": {
                       "type": "boolean"
                     },
                     "attributes": {
@@ -19426,6 +19430,7 @@
                     "email",
                     "status",
                     "locked",
+                    "passwordResetRequired",
                     "attributes",
                     "roles",
                     "createdAt",
@@ -19446,6 +19451,9 @@
                       ]
                     },
                     "locked": {
+                      "type": "boolean"
+                    },
+                    "passwordResetRequired": {
                       "type": "boolean"
                     },
                     "attributes": {
@@ -19950,6 +19958,7 @@
                           "email",
                           "status",
                           "locked",
+                          "passwordResetRequired",
                           "attributes",
                           "roles",
                           "createdAt",
@@ -19970,6 +19979,9 @@
                             ]
                           },
                           "locked": {
+                            "type": "boolean"
+                          },
+                          "passwordResetRequired": {
                             "type": "boolean"
                           },
                           "attributes": {
@@ -20397,6 +20409,7 @@
                     "email",
                     "status",
                     "locked",
+                    "passwordResetRequired",
                     "attributes",
                     "roles",
                     "createdAt",
@@ -20417,6 +20430,9 @@
                       ]
                     },
                     "locked": {
+                      "type": "boolean"
+                    },
+                    "passwordResetRequired": {
                       "type": "boolean"
                     },
                     "attributes": {
@@ -20856,6 +20872,7 @@
                     "email",
                     "status",
                     "locked",
+                    "passwordResetRequired",
                     "attributes",
                     "roles",
                     "createdAt",
@@ -20876,6 +20893,9 @@
                       ]
                     },
                     "locked": {
+                      "type": "boolean"
+                    },
+                    "passwordResetRequired": {
                       "type": "boolean"
                     },
                     "attributes": {
@@ -21730,7 +21750,7 @@
     "/dashboard/v1/workspaces/{workspaceId}/user-pools/{poolId}/users/{userId}/reset-password": {
       "post": {
         "operationId": "resetPoolUserPassword",
-        "summary": "Reset a user's password: a temporary password, shown once (owners only)",
+        "summary": "Require a password reset: the user's sessions end and their next sign-in asks them to choose a new password (owners only)",
         "tags": [
           "User pools"
         ],
@@ -21770,17 +21790,72 @@
         ],
         "responses": {
           "200": {
-            "description": "The temporary password. Give it to the user; it isn't shown again.",
+            "description": "The user, with passwordResetRequired",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "required": [
-                    "temporaryPassword"
+                    "id",
+                    "email",
+                    "status",
+                    "locked",
+                    "passwordResetRequired",
+                    "attributes",
+                    "roles",
+                    "createdAt",
+                    "lastLoginAt"
                   ],
                   "properties": {
-                    "temporaryPassword": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "email": {
                       "type": "string"
+                    },
+                    "status": {
+                      "enum": [
+                        "active",
+                        "disabled"
+                      ]
+                    },
+                    "locked": {
+                      "type": "boolean"
+                    },
+                    "passwordResetRequired": {
+                      "type": "boolean"
+                    },
+                    "attributes": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ]
+                      }
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "lastLoginAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
                     }
                   },
                   "additionalProperties": false
@@ -21944,6 +22019,1080 @@
                   "error": {
                     "code": "FORBIDDEN",
                     "message": "Only workspace owners can do this",
+                    "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: no such workspace, pool or user (or you aren't a member).",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Unique ID of this request, generated by the gateway"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Stable, machine-readable error code"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "example": {
+                  "error": {
+                    "code": "NOT_FOUND",
+                    "message": "User pool not found",
+                    "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "CONFLICT: the workspace is being deleted (crypto-shredded). Only finishing the deletion is possible.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Unique ID of this request, generated by the gateway"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Stable, machine-readable error code"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "example": {
+                  "error": {
+                    "code": "CONFLICT",
+                    "message": "This workspace is being deleted",
+                    "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "UPSTREAM_UNAVAILABLE: the identity service can't be reached.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Unique ID of this request, generated by the gateway"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Stable, machine-readable error code"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "example": {
+                  "error": {
+                    "code": "UPSTREAM_UNAVAILABLE",
+                    "message": "Identity service is unavailable",
+                    "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SECRETS_SEALED: creating a pool needs the vault unsealed. SERVICE_UNAVAILABLE: the audit log is unavailable (changes are refused).",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Unique ID of this request, generated by the gateway"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Stable, machine-readable error code"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "example": {
+                  "error": {
+                    "code": "SECRETS_SEALED",
+                    "message": "The secrets service is sealed until an operator unseals it",
+                    "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/v1/workspaces/{workspaceId}/user-pools/{poolId}/users/{userId}/unlock": {
+      "post": {
+        "operationId": "unlockPoolUser",
+        "summary": "Unlock a user locked after repeated wrong passwords (owners only)",
+        "tags": [
+          "User pools"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "in": "path",
+            "name": "workspaceId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "in": "path",
+            "name": "poolId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "in": "path",
+            "name": "userId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The user, no longer locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "email",
+                    "status",
+                    "locked",
+                    "passwordResetRequired",
+                    "attributes",
+                    "roles",
+                    "createdAt",
+                    "lastLoginAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "enum": [
+                        "active",
+                        "disabled"
+                      ]
+                    },
+                    "locked": {
+                      "type": "boolean"
+                    },
+                    "passwordResetRequired": {
+                      "type": "boolean"
+                    },
+                    "attributes": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ]
+                      }
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "lastLoginAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: invalid input.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Unique ID of this request, generated by the gateway"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Stable, machine-readable error code"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "example": {
+                  "error": {
+                    "code": "BAD_REQUEST",
+                    "message": "Invalid input",
+                    "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: not signed in, or the session expired.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Unique ID of this request, generated by the gateway"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Stable, machine-readable error code"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "example": {
+                  "error": {
+                    "code": "UNAUTHORIZED",
+                    "message": "Sign in first",
+                    "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: only workspace owners can do this (or a CSRF/Origin problem).",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Unique ID of this request, generated by the gateway"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Stable, machine-readable error code"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "example": {
+                  "error": {
+                    "code": "FORBIDDEN",
+                    "message": "Only workspace owners can do this",
+                    "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND: no such workspace, pool or user (or you aren't a member).",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Unique ID of this request, generated by the gateway"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Stable, machine-readable error code"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "example": {
+                  "error": {
+                    "code": "NOT_FOUND",
+                    "message": "User pool not found",
+                    "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "CONFLICT: the workspace is being deleted (crypto-shredded). Only finishing the deletion is possible.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Unique ID of this request, generated by the gateway"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Stable, machine-readable error code"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "example": {
+                  "error": {
+                    "code": "CONFLICT",
+                    "message": "This workspace is being deleted",
+                    "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "UPSTREAM_UNAVAILABLE: the identity service can't be reached.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Unique ID of this request, generated by the gateway"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Stable, machine-readable error code"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "example": {
+                  "error": {
+                    "code": "UPSTREAM_UNAVAILABLE",
+                    "message": "Identity service is unavailable",
+                    "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SECRETS_SEALED: creating a pool needs the vault unsealed. SERVICE_UNAVAILABLE: the audit log is unavailable (changes are refused).",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Unique ID of this request, generated by the gateway"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Stable, machine-readable error code"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "example": {
+                  "error": {
+                    "code": "SECRETS_SEALED",
+                    "message": "The secrets service is sealed until an operator unseals it",
+                    "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/v1/workspaces/{workspaceId}/user-pools/{poolId}/audit-events": {
+      "get": {
+        "operationId": "listPoolAuditEvents",
+        "summary": "A user pool's own audit log, newest first (separate from the workspace's)",
+        "tags": [
+          "User pools"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,3})?(Z|[+-][0-9]{2}:[0-9]{2})$"
+            },
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "description": "Only events at or after this time (ISO 8601)"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,3})?(Z|[+-][0-9]{2}:[0-9]{2})$"
+            },
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "description": "Only events before this time (ISO 8601)"
+          },
+          {
+            "schema": {
+              "enum": [
+                "pool_user.signed_up",
+                "pool_user.updated",
+                "pool_user.deleted",
+                "pool_user.password_reset",
+                "pool_user.password_changed",
+                "pool_user.logged_in",
+                "pool_user.login_failed",
+                "pool_user.logged_out",
+                "pool_user.token_reused",
+                "pool_user.unlocked",
+                "pool_role.created",
+                "pool_role.updated",
+                "pool_role.deleted",
+                "pool_user.role_added",
+                "pool_user.role_removed"
+              ]
+            },
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "description": "What happened"
+          },
+          {
+            "schema": {
+              "enum": [
+                "success",
+                "denied",
+                "failure"
+              ]
+            },
+            "in": "query",
+            "name": "outcome",
+            "required": false,
+            "description": "success; denied (e.g. a proxy target that isn't allowed); failure"
+          },
+          {
+            "schema": {
+              "enum": [
+                "pool_user",
+                "pool_role"
+              ]
+            },
+            "in": "query",
+            "name": "resourceType",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "in": "query",
+            "name": "resourceId",
+            "required": false,
+            "description": "e.g. a file ID or a secret's name"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "description": "Page size (1-100, default 50)"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,15}$"
+            },
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "description": "`nextCursor` from the previous page"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "in": "path",
+            "name": "workspaceId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "in": "path",
+            "name": "poolId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "events",
+                    "nextCursor"
+                  ],
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "occurredAt",
+                          "actorType",
+                          "actorId",
+                          "action",
+                          "resourceType",
+                          "resourceId",
+                          "outcome",
+                          "requestId",
+                          "sourceIp"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "occurredAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "actorType": {
+                            "enum": [
+                              "api_key",
+                              "user",
+                              "admin",
+                              "operator",
+                              "service"
+                            ],
+                            "description": "Who did it: one of your API keys, a dashboard user, a platform administrator, or a platform service"
+                          },
+                          "actorId": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "The API key's or dashboard user's ID (never a key, password or token), if any"
+                          },
+                          "action": {
+                            "enum": [
+                              "pool_user.signed_up",
+                              "pool_user.updated",
+                              "pool_user.deleted",
+                              "pool_user.password_reset",
+                              "pool_user.password_changed",
+                              "pool_user.logged_in",
+                              "pool_user.login_failed",
+                              "pool_user.logged_out",
+                              "pool_user.token_reused",
+                              "pool_user.unlocked",
+                              "pool_role.created",
+                              "pool_role.updated",
+                              "pool_role.deleted",
+                              "pool_user.role_added",
+                              "pool_user.role_removed"
+                            ],
+                            "description": "What happened"
+                          },
+                          "resourceType": {
+                            "enum": [
+                              "pool_user",
+                              "pool_role"
+                            ]
+                          },
+                          "resourceId": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "The file ID, secret name, key ID, connection name..."
+                          },
+                          "outcome": {
+                            "enum": [
+                              "success",
+                              "denied",
+                              "failure"
+                            ],
+                            "description": "success; denied (e.g. a proxy target that isn't allowed); failure"
+                          },
+                          "requestId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true,
+                            "description": "The X-Request-Id of the request that caused it"
+                          },
+                          "sourceIp": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "The client's IP address, as the gateway saw it"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Pass as `cursor` to get the next page; null when there are no more."
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BAD_REQUEST: invalid input.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Unique ID of this request, generated by the gateway"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Stable, machine-readable error code"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "example": {
+                  "error": {
+                    "code": "BAD_REQUEST",
+                    "message": "Invalid input",
+                    "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED: not signed in, or the session expired.",
+            "headers": {
+              "X-Request-Id": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Unique ID of this request, generated by the gateway"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Stable, machine-readable error code"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "example": {
+                  "error": {
+                    "code": "UNAUTHORIZED",
+                    "message": "Sign in first",
                     "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
                   }
                 }

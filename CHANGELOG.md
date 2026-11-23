@@ -8,6 +8,21 @@ adds things, and anything breaking would get a new version (`/v2/...`).
 
 ## [Unreleased]
 
+### Added
+
+- `passwordResetRequired` on the sign-in and refresh answers
+  (`POST /v1/user-pools/{poolId}/sessions` and `.../sessions/refresh`) and on
+  every pool user: `true` after a workspace owner reset the user's password.
+  Send the user to choose a new one with
+  `POST /v1/user-pools/{poolId}/users/{userId}/password`, which clears it.
+
+### Changed
+
+- New user pool events (`pool_user.*`, `pool_role.*`) are recorded in each
+  pool's own log, shown in the dashboard under User pools → User logs, and no
+  longer appear in `GET /v1/audit-events`. Events recorded before stay there
+  (docs/decisions/0036).
+
 ## [1.2.0] - 2026-11-21
 
 User pools (your app's own users), their roles, and feature flags. Only

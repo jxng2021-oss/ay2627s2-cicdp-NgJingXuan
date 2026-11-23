@@ -28,6 +28,7 @@ describe("pool users", () => {
       email: "ada@example.com",
       status: "active",
       locked: false,
+      passwordResetRequired: false,
       attributes: { name: "Ada", plan: "pro", beta: true },
       lastLoginAt: null,
     });
@@ -36,6 +37,7 @@ describe("pool users", () => {
     expect(audit.events.at(-1)).toMatchObject({
       action: "pool_user.signed_up",
       resourceId: user.id,
+      poolId: pool,
     });
     expect(JSON.stringify(audit.events)).not.toContain("ada@example.com");
   });
@@ -162,12 +164,19 @@ describe("pool users", () => {
     expect((await call(app, tenant, "GET", url)).statusCode).toBe(404);
   });
 
-  it("an owner's reset gives a temporary password once; the old one stops working", async () => {
+  it("an owner's reset ends the sessions and makes the next sign-in ask for a new password until it is changed", async () => {
     const { app, audit } = await startIdentity();
     const logs = captureLogs();
     const tenant = newTenant();
     const pool = await createPool(app, tenant);
     const user = await signUp(app, tenant, pool, "reset@example.com");
+    const login = (password: string) =>
+      call(app, tenant, "POST", `/pools/${pool}/sessions`, {
+        email: "reset@example.com",
+        password,
+      });
+    const before = (await login(PASSWORD)).json<Tokens>();
+    expect(before.passwordResetRequired).toBe(false);
 
     const reset = await call(
       app,
@@ -175,21 +184,98 @@ describe("pool users", () => {
       "POST",
       `/pools/${pool}/users/${user}/reset-password`,
     );
-    const { temporaryPassword } = reset.json<{ temporaryPassword: string }>();
+    expect(reset.statusCode).toBe(200);
+    expect(reset.json()).toMatchObject({
+      id: user,
+      passwordResetRequired: true,
+    });
+    expect(reset.body).not.toContain("temporaryPassword");
+    const oldSession = await call(
+      app,
+      tenant,
+      "POST",
+      `/pools/${pool}/sessions/refresh`,
+      { refreshToken: before.refreshToken },
+    );
+    expect(oldSession.statusCode).toBe(401);
+
+    const signedIn = await login(PASSWORD);
+    expect(signedIn.statusCode).toBe(200);
+    expect(signedIn.json<Tokens>().passwordResetRequired).toBe(true);
+
+    const changed = await call(
+      app,
+      tenant,
+      "POST",
+      `/pools/${pool}/users/${user}/password`,
+      { currentPassword: PASSWORD, newPassword: "a-brand-new-password-42" },
+    );
+    expect(changed.statusCode).toBe(204);
+    const after = await login("a-brand-new-password-42");
+    expect(after.json<Tokens>().passwordResetRequired).toBe(false);
+
+    expect(
+      audit.events.find((e) => e.action === "pool_user.password_reset"),
+    ).toMatchObject({ resourceId: user, poolId: pool });
+    expect(logs.text()).not.toContain("a-brand-new-password-42");
+  });
+
+  it("an owner unlocks a user locked after wrong passwords", async () => {
+    const { app, audit } = await startIdentity();
+    const tenant = newTenant();
+    const pool = await createPool(app, tenant);
+    const user = await signUp(app, tenant, pool, "locked@example.com");
     const login = (password: string) =>
       call(app, tenant, "POST", `/pools/${pool}/sessions`, {
-        email: "reset@example.com",
+        email: "locked@example.com",
         password,
       });
-
-    expect(temporaryPassword).toMatch(/^[A-Za-z0-9_-]{24}$/);
+    for (let i = 0; i < 5; i++) await login("wrong-password-123");
     expect((await login(PASSWORD)).statusCode).toBe(401);
-    expect((await login(temporaryPassword)).statusCode).toBe(200);
-    expect(audit.events.map((e) => e.action)).toContain(
-      "pool_user.password_reset",
+    const lockedUser = await call(
+      app,
+      tenant,
+      "GET",
+      `/pools/${pool}/users/${user}`,
     );
-    expect(JSON.stringify(audit.events)).not.toContain(temporaryPassword);
-    expect(logs.text()).not.toContain(temporaryPassword);
+    expect(lockedUser.json()).toMatchObject({ status: "active", locked: true });
+
+    const unlocked = await call(
+      app,
+      tenant,
+      "POST",
+      `/pools/${pool}/users/${user}/unlock`,
+    );
+    expect(unlocked.statusCode).toBe(200);
+    expect(unlocked.json()).toMatchObject({ locked: false });
+    expect((await login(PASSWORD)).statusCode).toBe(200);
+    expect(
+      audit.events.find((e) => e.action === "pool_user.unlocked"),
+    ).toMatchObject({ resourceId: user, poolId: pool, tenantId: tenant });
+
+    const otherTenant = await call(
+      app,
+      newTenant(),
+      "POST",
+      `/pools/${pool}/users/${user}/unlock`,
+    );
+    expect(otherTenant.statusCode).toBe(404);
+  });
+
+  it("pool user and role events name their pool; pool changes do not", async () => {
+    const { app, audit } = await startIdentity();
+    const tenant = newTenant();
+    const pool = await createPool(app, tenant);
+    await signUp(app, tenant, pool, "events@example.com");
+    await call(app, tenant, "POST", `/pools/${pool}/roles`, {
+      name: "editor",
+      permissions: ["posts:write"],
+    });
+
+    const byAction = new Map(audit.events.map((e) => [e.action, e]));
+    expect(byAction.get("user_pool.created")?.poolId).toBeUndefined();
+    expect(byAction.get("pool_user.signed_up")?.poolId).toBe(pool);
+    expect(byAction.get("pool_role.created")?.poolId).toBe(pool);
   });
 
   it("a user changes their own password with the current one; their sessions end", async () => {

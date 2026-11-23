@@ -41,6 +41,10 @@ install -d -o 1001 -g 1001 -m 0700 "$DATA_DIR/caddy"
 REPO_DIR="$(cd "$APP_DIR/.." && pwd)"
 commit="$(git -c safe.directory="$REPO_DIR" -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
 
+PROXY_ALLOWED_HOSTS="${PROXY_ALLOWED_HOSTS:-}"
+[[ -z "$PROXY_ALLOWED_HOSTS" || "$PROXY_ALLOWED_HOSTS" =~ ^[a-z0-9.-]+(,[a-z0-9.-]+)*$ ]] ||
+  fail "PROXY_ALLOWED_HOSTS must be host names separated by commas, e.g. api.example.com,api.stripe.com"
+
 IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-}"
 IMAGE_TAG="${IMAGE_TAG:-}"
 if [[ -n "$IMAGE_REPOSITORY" ]]; then
@@ -61,6 +65,7 @@ DASHBOARD_API_ORIGIN=https://api.$DOMAIN
 DASHBOARD_HOST=$DOMAIN
 API_HOST=api.$DOMAIN
 API_KEY_PREFIX=sk_live_
+PROXY_ALLOWED_HOSTS=$PROXY_ALLOWED_HOSTS
 EOF
 if [[ -n "$IMAGE_REPOSITORY" ]]; then
   printf 'IMAGE_REPOSITORY=%s\nIMAGE_TAG=%s\n' "$IMAGE_REPOSITORY" "$IMAGE_TAG" >>"$APP_DIR/.env"

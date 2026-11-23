@@ -231,6 +231,14 @@ export async function signInShopper(
   return shoppers().signIn({ email, password });
 }
 
+export async function changeShopperPassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  await shoppers().changePassword(userId, { currentPassword, newPassword });
+}
+
 export async function refreshShopper(
   refreshToken: string,
 ): Promise<ShopperTokens> {

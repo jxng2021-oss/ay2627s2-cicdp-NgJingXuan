@@ -66,6 +66,11 @@ export function identityRoutes(
     c.resetPassword,
   );
   app.post(
+    "/pools/:poolId/users/:userId/unlock",
+    { schema: { params: UserParams } },
+    c.unlockUser,
+  );
+  app.post(
     "/pools/:poolId/users/:userId/password",
     { schema: { params: UserParams, body: ChangePasswordBody } },
     c.changePassword,

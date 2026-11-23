@@ -118,6 +118,22 @@ describe("the identity service meets the internal contract", () => {
       `/pools/${pool}/users/${user}/reset-password`,
       reset,
     );
+    const unlocked = await call(
+      app,
+      tenant,
+      "POST",
+      `/pools/${pool}/users/${user}/unlock`,
+    );
+    expect(unlocked.statusCode).toBe(200);
+    expectContract("POST", `/pools/${pool}/users/${user}/unlock`, unlocked);
+    const noUser = await call(
+      app,
+      tenant,
+      "POST",
+      `/pools/${pool}/users/${missing}/unlock`,
+    );
+    expect(noUser.statusCode).toBe(404);
+    expectContract("POST", `/pools/${pool}/users/${missing}/unlock`, noUser);
 
     const jwks = await app.inject({
       method: "GET",
@@ -133,7 +149,7 @@ describe("the identity service meets the internal contract", () => {
     vault.sealed = true;
     const sealed = await call(app, tenant, "POST", `/pools/${pool}/sessions`, {
       email: "contract@example.com",
-      password: reset.json<{ temporaryPassword: string }>().temporaryPassword,
+      password: PASSWORD,
     });
     expect(sealed.statusCode).toBe(503);
     expectContract("POST", `/pools/${pool}/sessions`, sealed);

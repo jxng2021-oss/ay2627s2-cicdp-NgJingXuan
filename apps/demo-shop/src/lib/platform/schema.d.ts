@@ -9317,6 +9317,8 @@ export interface operations {
                         status: "active" | "disabled";
                         /** @description Locked for a while after repeated wrong passwords */
                         locked: boolean;
+                        /** @description An owner asked the user to choose a new password. Signing in still works and says passwordResetRequired; changing the password clears it. */
+                        passwordResetRequired: boolean;
                         /**
                          * @description Your app's own fields for the user (at most 20, short plain values). They are included in the user's tokens.
                          * @example {
@@ -9802,6 +9804,8 @@ export interface operations {
                         status: "active" | "disabled";
                         /** @description Locked for a while after repeated wrong passwords */
                         locked: boolean;
+                        /** @description An owner asked the user to choose a new password. Signing in still works and says passwordResetRequired; changing the password clears it. */
+                        passwordResetRequired: boolean;
                         /**
                          * @description Your app's own fields for the user (at most 20, short plain values). They are included in the user's tokens.
                          * @example {
@@ -10630,6 +10634,8 @@ export interface operations {
                         expiresIn: number;
                         /** @description Swap it for new tokens with POST .../sessions/refresh. It works ONCE: each refresh returns a new one. Keep it on your server. */
                         refreshToken: string;
+                        /** @description True when an owner asked this user to choose a new password: send them to your change-password page (POST .../users/{userId}/password) before anything else. */
+                        passwordResetRequired: boolean;
                         user: {
                             /** Format: uuid */
                             id: string;
@@ -10638,6 +10644,8 @@ export interface operations {
                             status: "active" | "disabled";
                             /** @description Locked for a while after repeated wrong passwords */
                             locked: boolean;
+                            /** @description An owner asked the user to choose a new password. Signing in still works and says passwordResetRequired; changing the password clears it. */
+                            passwordResetRequired: boolean;
                             /**
                              * @description Your app's own fields for the user (at most 20, short plain values). They are included in the user's tokens.
                              * @example {
@@ -11097,6 +11105,8 @@ export interface operations {
                         expiresIn: number;
                         /** @description Swap it for new tokens with POST .../sessions/refresh. It works ONCE: each refresh returns a new one. Keep it on your server. */
                         refreshToken: string;
+                        /** @description True when an owner asked this user to choose a new password: send them to your change-password page (POST .../users/{userId}/password) before anything else. */
+                        passwordResetRequired: boolean;
                         user: {
                             /** Format: uuid */
                             id: string;
@@ -11105,6 +11115,8 @@ export interface operations {
                             status: "active" | "disabled";
                             /** @description Locked for a while after repeated wrong passwords */
                             locked: boolean;
+                            /** @description An owner asked the user to choose a new password. Signing in still works and says passwordResetRequired; changing the password clears it. */
+                            passwordResetRequired: boolean;
                             /**
                              * @description Your app's own fields for the user (at most 20, short plain values). They are included in the user's tokens.
                              * @example {
@@ -13593,6 +13605,8 @@ export interface operations {
                         status: "active" | "disabled";
                         /** @description Locked for a while after repeated wrong passwords */
                         locked: boolean;
+                        /** @description An owner asked the user to choose a new password. Signing in still works and says passwordResetRequired; changing the password clears it. */
+                        passwordResetRequired: boolean;
                         /**
                          * @description Your app's own fields for the user (at most 20, short plain values). They are included in the user's tokens.
                          * @example {
@@ -14010,6 +14024,8 @@ export interface operations {
                         status: "active" | "disabled";
                         /** @description Locked for a while after repeated wrong passwords */
                         locked: boolean;
+                        /** @description An owner asked the user to choose a new password. Signing in still works and says passwordResetRequired; changing the password clears it. */
+                        passwordResetRequired: boolean;
                         /**
                          * @description Your app's own fields for the user (at most 20, short plain values). They are included in the user's tokens.
                          * @example {

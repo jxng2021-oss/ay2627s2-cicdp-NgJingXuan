@@ -200,5 +200,6 @@ export interface Tokens {
   refreshToken: string;
   expiresIn: number;
   tokenType: string;
+  passwordResetRequired: boolean;
   user: { id: string; email: string };
 }

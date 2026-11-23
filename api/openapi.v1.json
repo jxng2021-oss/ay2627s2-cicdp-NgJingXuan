@@ -18263,6 +18263,7 @@
                     "email",
                     "status",
                     "locked",
+                    "passwordResetRequired",
                     "attributes",
                     "roles",
                     "createdAt",
@@ -18285,6 +18286,10 @@
                     "locked": {
                       "type": "boolean",
                       "description": "Locked for a while after repeated wrong passwords"
+                    },
+                    "passwordResetRequired": {
+                      "type": "boolean",
+                      "description": "An owner asked the user to choose a new password. Signing in still works and says passwordResetRequired; changing the password clears it."
                     },
                     "attributes": {
                       "type": "object",
@@ -19279,6 +19284,7 @@
                     "email",
                     "status",
                     "locked",
+                    "passwordResetRequired",
                     "attributes",
                     "roles",
                     "createdAt",
@@ -19301,6 +19307,10 @@
                     "locked": {
                       "type": "boolean",
                       "description": "Locked for a while after repeated wrong passwords"
+                    },
+                    "passwordResetRequired": {
+                      "type": "boolean",
+                      "description": "An owner asked the user to choose a new password. Signing in still works and says passwordResetRequired; changing the password clears it."
                     },
                     "attributes": {
                       "type": "object",
@@ -21016,6 +21026,7 @@
                     "tokenType",
                     "expiresIn",
                     "refreshToken",
+                    "passwordResetRequired",
                     "user"
                   ],
                   "properties": {
@@ -21036,6 +21047,10 @@
                       "type": "string",
                       "description": "Swap it for new tokens with POST .../sessions/refresh. It works ONCE: each refresh returns a new one. Keep it on your server."
                     },
+                    "passwordResetRequired": {
+                      "type": "boolean",
+                      "description": "True when an owner asked this user to choose a new password: send them to your change-password page (POST .../users/{userId}/password) before anything else."
+                    },
                     "user": {
                       "type": "object",
                       "required": [
@@ -21043,6 +21058,7 @@
                         "email",
                         "status",
                         "locked",
+                        "passwordResetRequired",
                         "attributes",
                         "roles",
                         "createdAt",
@@ -21065,6 +21081,10 @@
                         "locked": {
                           "type": "boolean",
                           "description": "Locked for a while after repeated wrong passwords"
+                        },
+                        "passwordResetRequired": {
+                          "type": "boolean",
+                          "description": "An owner asked the user to choose a new password. Signing in still works and says passwordResetRequired; changing the password clears it."
                         },
                         "attributes": {
                           "type": "object",
@@ -22006,6 +22026,7 @@
                     "tokenType",
                     "expiresIn",
                     "refreshToken",
+                    "passwordResetRequired",
                     "user"
                   ],
                   "properties": {
@@ -22026,6 +22047,10 @@
                       "type": "string",
                       "description": "Swap it for new tokens with POST .../sessions/refresh. It works ONCE: each refresh returns a new one. Keep it on your server."
                     },
+                    "passwordResetRequired": {
+                      "type": "boolean",
+                      "description": "True when an owner asked this user to choose a new password: send them to your change-password page (POST .../users/{userId}/password) before anything else."
+                    },
                     "user": {
                       "type": "object",
                       "required": [
@@ -22033,6 +22058,7 @@
                         "email",
                         "status",
                         "locked",
+                        "passwordResetRequired",
                         "attributes",
                         "roles",
                         "createdAt",
@@ -22055,6 +22081,10 @@
                         "locked": {
                           "type": "boolean",
                           "description": "Locked for a while after repeated wrong passwords"
+                        },
+                        "passwordResetRequired": {
+                          "type": "boolean",
+                          "description": "An owner asked the user to choose a new password. Signing in still works and says passwordResetRequired; changing the password clears it."
                         },
                         "attributes": {
                           "type": "object",
@@ -27297,6 +27327,7 @@
                     "email",
                     "status",
                     "locked",
+                    "passwordResetRequired",
                     "attributes",
                     "roles",
                     "createdAt",
@@ -27319,6 +27350,10 @@
                     "locked": {
                       "type": "boolean",
                       "description": "Locked for a while after repeated wrong passwords"
+                    },
+                    "passwordResetRequired": {
+                      "type": "boolean",
+                      "description": "An owner asked the user to choose a new password. Signing in still works and says passwordResetRequired; changing the password clears it."
                     },
                     "attributes": {
                       "type": "object",
@@ -28185,6 +28220,7 @@
                     "email",
                     "status",
                     "locked",
+                    "passwordResetRequired",
                     "attributes",
                     "roles",
                     "createdAt",
@@ -28207,6 +28243,10 @@
                     "locked": {
                       "type": "boolean",
                       "description": "Locked for a while after repeated wrong passwords"
+                    },
+                    "passwordResetRequired": {
+                      "type": "boolean",
+                      "description": "An owner asked the user to choose a new password. Signing in still works and says passwordResetRequired; changing the password clears it."
                     },
                     "attributes": {
                       "type": "object",

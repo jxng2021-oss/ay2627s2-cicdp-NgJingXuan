@@ -80,7 +80,8 @@ export function createRoleService(deps: IdentityDeps, users: UserService) {
             description: input.description ?? "",
             permissions: input.permissions,
           }),
-        (saved) => auditEvent(actor, "pool_role.created", "success", saved.id),
+        (saved) =>
+          auditEvent(actor, "pool_role.created", "success", saved.id, pool.id),
       );
       if (!role)
         throw new AppError(
@@ -104,7 +105,8 @@ export function createRoleService(deps: IdentityDeps, users: UserService) {
       const role = await recorded(
         actor,
         (tx) => updateRole(tx, pool.id, roleName, changes),
-        (saved) => auditEvent(actor, "pool_role.updated", "success", saved.id),
+        (saved) =>
+          auditEvent(actor, "pool_role.updated", "success", saved.id, pool.id),
       );
       if (!role) throw roleNotFound();
       return (await findRole(db, pool.id, role.name))!;
@@ -115,7 +117,8 @@ export function createRoleService(deps: IdentityDeps, users: UserService) {
       const deleted = await recorded(
         actor,
         (tx) => deleteRole(tx, pool.id, roleName),
-        (role) => auditEvent(actor, "pool_role.deleted", "success", role.id),
+        (role) =>
+          auditEvent(actor, "pool_role.deleted", "success", role.id, pool.id),
       );
       if (!deleted) throw roleNotFound();
     },
@@ -142,7 +145,8 @@ export function createRoleService(deps: IdentityDeps, users: UserService) {
         actor,
         async (tx) =>
           (await addUserRole(tx, user.id, role.id)) ? user.id : undefined,
-        (id) => auditEvent(actor, "pool_user.role_added", "success", id),
+        (id) =>
+          auditEvent(actor, "pool_user.role_added", "success", id, user.poolId),
       );
       return users.withRoles(user);
     },
@@ -158,7 +162,14 @@ export function createRoleService(deps: IdentityDeps, users: UserService) {
         actor,
         async (tx) =>
           (await removeUserRole(tx, user.id, role.id)) ? user.id : undefined,
-        (id) => auditEvent(actor, "pool_user.role_removed", "success", id),
+        (id) =>
+          auditEvent(
+            actor,
+            "pool_user.role_removed",
+            "success",
+            id,
+            user.poolId,
+          ),
       );
       return users.withRoles(user);
     },

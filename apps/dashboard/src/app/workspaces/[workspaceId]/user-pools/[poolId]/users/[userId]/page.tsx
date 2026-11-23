@@ -8,23 +8,22 @@ import {
   Button,
   Card,
   ConfirmDialog,
-  CopyButton,
   EmptyState,
   ErrorState,
   Loading,
   PageHeader,
   ShortValue,
-  Status,
   formatDate,
 } from "@/components/ui";
 import { UserRoles } from "@/components/pool-roles";
+import { PoolUserStatus } from "@/components/pool-user-status";
 import { ApiError } from "@/lib/api/client";
 import { workspace as api } from "@/lib/api/endpoints";
 import { useToast } from "@/lib/toast";
 import { useLoad } from "@/lib/use-load";
 import { useWorkspace } from "@/lib/workspace";
 
-type Pending = "disable" | "enable" | "reset" | "delete";
+type Pending = "disable" | "enable" | "unlock" | "reset" | "delete";
 
 export default function PoolUserPage() {
   const { poolId, userId } = useParams<{ poolId: string; userId: string }>();
@@ -38,7 +37,6 @@ export default function PoolUserPage() {
   const [pending, setPending] = useState<Pending>();
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>();
-  const [temporary, setTemporary] = useState<string>();
   const back = `/workspaces/${id}/user-pools/${poolId}`;
 
   if (user.status === "loading") return <Loading />;
@@ -70,13 +68,13 @@ export default function PoolUserPage() {
         await api.setPoolUserStatus(id, poolId, userId, status);
         toast(`${info.email} ${pending === "enable" ? "enabled" : "disabled"}`);
         user.reload();
+      } else if (pending === "unlock") {
+        await api.unlockPoolUser(id, poolId, userId);
+        toast(`${info.email} unlocked`);
+        user.reload();
       } else if (pending === "reset") {
-        const { temporaryPassword } = await api.resetPoolUserPassword(
-          id,
-          poolId,
-          userId,
-        );
-        setTemporary(temporaryPassword);
+        await api.resetPoolUserPassword(id, poolId, userId);
+        toast(`${info.email} must choose a new password at their next sign in`);
         user.reload();
       } else if (pending === "delete") {
         await api.deletePoolUser(id, poolId, userId);
@@ -100,9 +98,13 @@ export default function PoolUserPage() {
       title: "Enable user",
       text: "They can sign in again.",
     },
+    unlock: {
+      title: "Unlock user",
+      text: "They can sign in again straight away instead of waiting for the lock to end.",
+    },
     reset: {
       title: "Reset password",
-      text: "They get a new temporary password, shown once, and are signed out everywhere.",
+      text: "They are signed out everywhere. They sign in with their current password and your app then asks them to choose a new one.",
     },
     delete: {
       title: "Delete user",
@@ -123,45 +125,13 @@ export default function PoolUserPage() {
         }
       />
 
-      {temporary && (
-        <section className="banner" aria-labelledby="temporary-title">
-          <div className="section">
-            <p className="banner-title" id="temporary-title">
-              Temporary password for {info.email}
-            </p>
-            <p className="muted">
-              Shown only now. Give it to the user privately; their other
-              sessions have ended. They can change it from your app.
-            </p>
-            <div className="row">
-              <code className="secret-value" aria-label="Temporary password">
-                {temporary}
-              </code>
-              <CopyButton value={temporary} label="Copy password" />
-            </div>
-            <div>
-              <Button variant="ghost" onClick={() => setTemporary(undefined)}>
-                Hide password
-              </Button>
-            </div>
-          </div>
-        </section>
-      )}
-
       <Card title="Details">
         <div className="section">
           <h2>Details</h2>
           <dl className="details-grid">
             <dt>Status</dt>
             <dd>
-              <span className="row">
-                {info.status === "active" ? (
-                  <Status tone="success">Active</Status>
-                ) : (
-                  <Status tone="warning">Disabled</Status>
-                )}
-                {info.locked && <Status tone="danger">Locked</Status>}
-              </span>
+              <PoolUserStatus user={info} />
             </dd>
             <dt>User ID</dt>
             <dd>
@@ -211,8 +181,18 @@ export default function PoolUserPage() {
                   Enable user
                 </Button>
               )}
-              <Button onClick={() => setPending("reset")}>
-                Reset password
+              {info.locked && (
+                <Button onClick={() => setPending("unlock")}>
+                  Unlock user
+                </Button>
+              )}
+              <Button
+                onClick={() => setPending("reset")}
+                disabled={info.passwordResetRequired}
+              >
+                {info.passwordResetRequired
+                  ? "Password reset pending"
+                  : "Reset password"}
               </Button>
               <Button variant="danger" onClick={() => setPending("delete")}>
                 Delete user

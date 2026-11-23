@@ -165,6 +165,10 @@ export const User = Type.Object(
     locked: Type.Boolean({
       description: "Locked for a while after repeated wrong passwords",
     }),
+    passwordResetRequired: Type.Boolean({
+      description:
+        "An owner asked the user to choose a new password. Signing in still works and says passwordResetRequired; changing the password clears it.",
+    }),
     attributes: Attributes,
     roles: Type.Array(Type.String(), {
       description: "The names of the user's roles",
@@ -188,6 +192,10 @@ export const Tokens = Type.Object(
     refreshToken: Type.String({
       description:
         "Swap it for new tokens with POST .../sessions/refresh. It works ONCE: each refresh returns a new one. Keep it on your server.",
+    }),
+    passwordResetRequired: Type.Boolean({
+      description:
+        "True when an owner asked this user to choose a new password: send them to your change-password page (POST .../users/{userId}/password) before anything else.",
     }),
     user: User,
   },

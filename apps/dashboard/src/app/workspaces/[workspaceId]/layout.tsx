@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { AppNavbar } from "@/components/app-navbar";
 import { DeleteWorkspaceDialog } from "@/components/delete-workspace";
 import { Icon } from "@/components/icons";
+import { SidebarNav } from "@/components/sidebar-nav";
 import { NotFound } from "@/components/not-found";
 import { Banner, Button, ErrorState, Loading } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
@@ -104,43 +105,11 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
               <Icon name="arrow-left" size={16} />
               Back to workspaces
             </Link>
-            <nav className="nav" aria-label="Workspace">
-              {WORKSPACE_NAV.map((group) => {
-                const groupId = `nav-${group.label.toLowerCase()}`;
-                return (
-                  <div className="nav-group" key={group.label}>
-                    <p className="eyebrow" id={groupId}>
-                      {group.label}
-                    </p>
-                    <ul aria-labelledby={groupId}>
-                      {group.items.map((item) => {
-                        const href = `${base}${item.path}`;
-                        const current =
-                          pathname === href ||
-                          (item.path !== "" && pathname.startsWith(`${href}/`));
-                        return (
-                          <li key={item.path}>
-                            <Link
-                              href={href}
-                              aria-current={current ? "page" : undefined}
-                            >
-                              <span className="nav-icon" aria-hidden="true">
-                                <Icon
-                                  name={item.icon}
-                                  size={18}
-                                  weight="light"
-                                />
-                              </span>
-                              {item.label}
-                            </Link>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                );
-              })}
-            </nav>
+            <SidebarNav
+              groups={WORKSPACE_NAV}
+              base={base}
+              pathname={pathname}
+            />
           </aside>
           <main className="main">
             <div className="page">

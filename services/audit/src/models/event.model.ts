@@ -55,6 +55,7 @@ export async function appendEvent(
 }
 
 export interface EventFilters {
+  tenantId?: string;
   from?: Date;
   to?: Date;
   action?: string;
@@ -71,6 +72,8 @@ export function listEvents(
   limit: number,
 ): Promise<AuditRow[]> {
   const conditions: SQL[] = [eq(auditEvents.chain, chain)];
+  if (filters.tenantId)
+    conditions.push(eq(auditEvents.tenantId, filters.tenantId));
   if (filters.from) conditions.push(gte(auditEvents.occurredAt, filters.from));
   if (filters.to) conditions.push(lt(auditEvents.occurredAt, filters.to));
   if (filters.action) conditions.push(eq(auditEvents.action, filters.action));

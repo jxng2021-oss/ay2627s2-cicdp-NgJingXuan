@@ -295,6 +295,7 @@ export async function fakeIdentity() {
     email: "ada@example.com",
     status: "active",
     locked: false,
+    passwordResetRequired: false,
     attributes: {},
     roles: [] as string[],
     createdAt: new Date().toISOString(),
@@ -373,6 +374,7 @@ export async function fakeIdentity() {
         tokenType: "Bearer",
         expiresIn: 900,
         refreshToken: "r".repeat(43),
+        passwordResetRequired: user.passwordResetRequired,
         user,
       });
     }
@@ -424,7 +426,10 @@ export async function fakeIdentity() {
     }
     if (sub === "users") {
       if (action === "reset-password") {
-        return json(200, { temporaryPassword: "t".repeat(24) });
+        return json(200, { ...user, passwordResetRequired: true });
+      }
+      if (action === "unlock") {
+        return json(200, { ...user, locked: false });
       }
       if (action === "password" || request.method === "DELETE") {
         return { status: 204, headers: { "cache-control": "no-store" } };
