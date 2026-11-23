@@ -63,17 +63,20 @@ export function AccountDialog({
 }) {
   const [tab, setTab] = useState<Tab>("profile");
   const baseId = useId();
+  const tabs = TABS.filter(
+    ([value]) => value !== "password" || me.user.hasPassword,
+  );
   useEffect(() => {
     if (open) setTab("profile");
   }, [open]);
 
   function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    const index = TABS.findIndex(([value]) => value === tab);
+    const index = tabs.findIndex(([value]) => value === tab);
     const step =
       event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
     if (!step) return;
     event.preventDefault();
-    const next = TABS[(index + step + TABS.length) % TABS.length]![0];
+    const next = tabs[(index + step + tabs.length) % tabs.length]![0];
     setTab(next);
     document.getElementById(`${baseId}-${next}-tab`)?.focus();
   }
@@ -89,7 +92,7 @@ export function AccountDialog({
         aria-label="Account"
         onKeyDown={onKeyDown}
       >
-        {TABS.map(([value, label]) => (
+        {tabs.map(([value, label]) => (
           <button
             key={value}
             type="button"
@@ -116,7 +119,7 @@ export function AccountDialog({
         {tab === "workspaces" && (
           <Workspaces workspaces={me.workspaces} onLeft={onChanged} />
         )}
-        {tab === "delete" && <DeleteAccount />}
+        {tab === "delete" && <DeleteAccount me={me} />}
       </div>
       <div className="form-actions">
         <Button variant="ghost" onClick={onClose}>
@@ -542,9 +545,10 @@ function Workspaces({
   );
 }
 
-function DeleteAccount() {
+function DeleteAccount({ me }: { me: Me }) {
   const router = useRouter();
   const markSignedIn = useMarkSignedIn();
+  const hasPassword = me.user.hasPassword;
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [problem, setProblem] = useState<string>();
@@ -561,19 +565,27 @@ function DeleteAccount() {
 
   async function remove() {
     if (!password) {
-      setProblem("Enter your password to confirm.");
+      setProblem(
+        hasPassword
+          ? "Enter your password to confirm."
+          : "Type your email address to confirm.",
+      );
       return;
     }
     setBusy(true);
     setProblem(undefined);
     setFailure(undefined);
     try {
-      await account.deleteAccount(password);
+      await account.deleteAccount(
+        hasPassword ? { password } : { email: password },
+      );
       markSignedIn(false);
       router.replace("/login");
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setProblem("That isn't your password.");
+      } else if (error instanceof ApiError && error.status === 400) {
+        setProblem("That isn't your email address.");
       } else if (error instanceof ApiError && error.code === "CONFLICT") {
         setProblem(error.message);
       } else {
@@ -608,11 +620,16 @@ function DeleteAccount() {
         onConfirm={() => void remove()}
         onCancel={close}
       >
-        <p>This can&apos;t be undone. Enter your password to confirm.</p>
+        <p>
+          This can&apos;t be undone.{" "}
+          {hasPassword
+            ? "Enter your password to confirm."
+            : `Type ${me.user.email} to confirm.`}
+        </p>
         <Field
-          label="Password"
-          type="password"
-          autoComplete="current-password"
+          label={hasPassword ? "Password" : "Email"}
+          type={hasPassword ? "password" : "email"}
+          autoComplete={hasPassword ? "current-password" : "off"}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={problem}

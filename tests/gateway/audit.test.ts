@@ -284,6 +284,7 @@ describe("GET /v1/audit-events", () => {
       "secrets.sealed",
       "file.access_denied",
       "tenant.shredded",
+      "user.oauth_linked",
     ];
     const tenantActions =
       spec.components.schemas.NewEvent.properties.action.enum.filter(

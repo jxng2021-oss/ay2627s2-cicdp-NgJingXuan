@@ -3,6 +3,7 @@ import type { DashboardSettings } from "./routes/dashboard/index.js";
 import { DEFAULT_REFRESH_GRACE_MS } from "./services/session.service.js";
 import { API_KEY_PREFIX_PATTERN } from "./services/api-key-tokens.service.js";
 import type { RateLimitSettings } from "./limits.js";
+import type { OAuthClient, OAuthSettings } from "./services/oauth.service.js";
 import type { ProxyPolicy } from "./services/ssrf.service.js";
 
 export interface GatewayConfig {
@@ -154,7 +155,52 @@ export function parseDashboard(
       perIp: number("RATE_LIMIT_AUTH_PER_IP", 10),
       perEmail: number("RATE_LIMIT_AUTH_PER_EMAIL", 5),
     },
+    oauth: parseOAuth(env),
   };
+}
+
+export function parseOAuth(env: NodeJS.ProcessEnv): OAuthSettings {
+  const redirectOrigin = env.GATEWAY_PUBLIC_ORIGIN ?? "http://localhost:8080";
+  let parsed: URL;
+  try {
+    parsed = new URL(redirectOrigin);
+  } catch {
+    throw new Error(
+      "GATEWAY_PUBLIC_ORIGIN must be an origin like https://api.example.com",
+    );
+  }
+  if (parsed.origin !== redirectOrigin) {
+    throw new Error(
+      "GATEWAY_PUBLIC_ORIGIN must be an origin like https://api.example.com (no path or trailing slash)",
+    );
+  }
+  const google = oauthClient(env, "GOOGLE");
+  const github = oauthClient(env, "GITHUB");
+  if (
+    (google || github) &&
+    parsed.protocol !== "https:" &&
+    env.NODE_ENV === "production"
+  ) {
+    throw new Error(
+      "GATEWAY_PUBLIC_ORIGIN must use https when Google or GitHub sign in is on in production",
+    );
+  }
+  return { redirectOrigin, google, github };
+}
+
+function oauthClient(
+  env: NodeJS.ProcessEnv,
+  prefix: "GOOGLE" | "GITHUB",
+): OAuthClient | undefined {
+  const clientId = env[`${prefix}_CLIENT_ID`]?.trim();
+  const clientSecret = env[`${prefix}_CLIENT_SECRET`]?.trim();
+  if (!clientId && !clientSecret) return undefined;
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      `${prefix}_CLIENT_ID and ${prefix}_CLIENT_SECRET must be set together`,
+    );
+  }
+  return { clientId, clientSecret };
 }
 
 export function parseAdminApiEnabled(env: NodeJS.ProcessEnv): boolean {

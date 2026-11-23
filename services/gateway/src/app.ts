@@ -20,6 +20,7 @@ import type { Database } from "./db/client.js";
 import { installErrorHandling, sendError } from "./errors.js";
 import { rateLimitingDownWarning, type RateLimitSettings } from "./limits.js";
 import { loggerOptions, logRequests } from "./logging.js";
+import type { HttpFetch } from "./services/oauth.service.js";
 import { RateLimiter, type RateLimitStore } from "./rate-limit.js";
 import { adminRoutes } from "./routes/admin.routes.js";
 import {
@@ -58,6 +59,7 @@ export interface GatewayAppOptions {
   apiDocsEnabled?: boolean;
   openApiDocument?: "public" | "dashboard";
   dashboard: DashboardSettings;
+  oauthFetch?: HttpFetch;
   adminApiEnabled?: boolean;
   proxy: ProxyPolicy;
   resolver?: Resolver;
@@ -166,6 +168,7 @@ export function buildApp(options: GatewayAppOptions): FastifyInstance {
     routes.register(dashboardApi, {
       prefix: "/dashboard/v1",
       ...options,
+      oauthFetch: options.oauthFetch ?? fetch,
       limiters: {
         authPerIp: limiter("auth-ip", options.dashboard.authLimits.perIp),
         authPerEmail: limiter(

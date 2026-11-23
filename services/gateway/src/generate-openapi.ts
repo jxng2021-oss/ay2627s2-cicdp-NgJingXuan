@@ -17,6 +17,11 @@ const app = buildApp({
       cookieSecure: true,
     },
     authLimits: { perIp: 1, perEmail: 1 },
+    oauth: {
+      redirectOrigin: "https://api.invalid",
+      google: undefined,
+      github: undefined,
+    },
   },
   db: {} as Database,
   rateLimitStore: new MemoryRateLimitStore(),

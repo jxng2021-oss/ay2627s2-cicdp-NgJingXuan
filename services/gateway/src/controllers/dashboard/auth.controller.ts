@@ -68,6 +68,7 @@ export function authController(options: DashboardOptions) {
         email: user?.email ?? "",
         displayName: user?.displayName ?? null,
         createdAt: user?.createdAt.toISOString() ?? new Date(0).toISOString(),
+        hasPassword: Boolean(user?.passwordHash),
       },
       workspaces: workspaces.map((w) => ({
         id: w.tenantId,
@@ -170,6 +171,14 @@ export function authController(options: DashboardOptions) {
       const session = request.dashboardSession!;
       const refused = await limited(request, reply, session.user.email);
       if (refused) return refused;
+      if (!session.user.passwordHash) {
+        return sendError(
+          reply,
+          400,
+          "BAD_REQUEST",
+          "This account signs in with Google or GitHub and has no password",
+        );
+      }
       if (
         !(await verifyPassword(
           session.user.passwordHash,
@@ -253,14 +262,24 @@ export function authController(options: DashboardOptions) {
     },
 
     deleteAccount: async (
-      request: Body<{ password: string }>,
+      request: Body<{ password?: string; email?: string }>,
       reply: FastifyReply,
     ) => {
       const { user } = request.dashboardSession!;
       const refused = await limited(request, reply, user.email);
       if (refused) return refused;
-      if (!(await verifyPassword(user.passwordHash, request.body.password))) {
-        return sendError(reply, 401, "UNAUTHORIZED", "The password is wrong");
+      if (user.passwordHash) {
+        const { password } = request.body;
+        if (!password || !(await verifyPassword(user.passwordHash, password))) {
+          return sendError(reply, 401, "UNAUTHORIZED", "The password is wrong");
+        }
+      } else if (normaliseEmail(request.body.email ?? "") !== user.email) {
+        return sendError(
+          reply,
+          400,
+          "BAD_REQUEST",
+          "Type your email address to confirm",
+        );
       }
       const sole = await account.soleOwnedWorkspace(user.id);
       if (sole) {

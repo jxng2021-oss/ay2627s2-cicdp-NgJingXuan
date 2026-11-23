@@ -131,6 +131,45 @@ function cookie(
   return parts.join("; ");
 }
 
+export const OAUTH_COOKIE_PATH = "/dashboard/v1/auth/oauth";
+const OAUTH_STATE = /^[a-z]+\.[A-Za-z0-9_-]{43}\.[0-9]{10}\.[A-Za-z0-9_-]{43}$/;
+
+function oauthCookieName(settings: SessionSettings): string {
+  return settings.cookieSecure ? "__Secure-scp_oauth" : "scp_oauth";
+}
+
+export function setOAuthStateCookie(
+  reply: FastifyReply,
+  settings: SessionSettings,
+  value: string,
+  maxAgeSeconds: number,
+): void {
+  const parts = [
+    `${oauthCookieName(settings)}=${value}`,
+    `Path=${OAUTH_COOKIE_PATH}`,
+    `Max-Age=${maxAgeSeconds}`,
+    "HttpOnly",
+    "SameSite=Lax",
+  ];
+  if (settings.cookieSecure) parts.push("Secure");
+  reply.header("set-cookie", parts.join("; "));
+}
+
+export function readOAuthStateCookie(
+  request: FastifyRequest,
+  settings: SessionSettings,
+): string | undefined {
+  const prefix = `${oauthCookieName(settings)}=`;
+  for (const part of (request.headers.cookie ?? "").split(";")) {
+    const value = part.trim();
+    if (value.startsWith(prefix)) {
+      const state = value.slice(prefix.length);
+      return OAUTH_STATE.test(state) ? state : undefined;
+    }
+  }
+  return undefined;
+}
+
 function readCookie(request: FastifyRequest, name: string): string | undefined {
   const prefix = `${name}=`;
   for (const part of (request.headers.cookie ?? "").split(";")) {

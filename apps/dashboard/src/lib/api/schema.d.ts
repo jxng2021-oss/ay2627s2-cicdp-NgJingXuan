@@ -44,6 +44,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboard/v1/auth/oauth/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The sign in providers that are set up */
+        get: operations["oauthProviders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/v1/auth/oauth/{provider}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Continue with Google or GitHub
+         * @description A browser navigation, not a fetch: redirects to the provider with a state and a PKCE challenge, kept in a short signed cookie.
+         */
+        get: operations["oauthStart"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/v1/auth/oauth/{provider}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where the provider sends the browser back
+         * @description Checks the state, exchanges the code (with the PKCE verifier) on the server, reads the provider's verified email, links or creates the account, starts a session and redirects to the dashboard. Failures redirect to /login?oauth_error=cancelled|failed|email_unverified|disabled|unavailable.
+         */
+        get: operations["oauthCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dashboard/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -203,7 +260,7 @@ export interface paths {
         put?: never;
         /**
          * Delete your account
-         * @description Needs your password. Refused while you are the only owner of a workspace: delete it, or make someone else an owner, first. Your memberships and sessions end.
+         * @description Needs your password, or, for an account without one (Google or GitHub only), your email address typed again. Refused while you are the only owner of a workspace: delete it, or make someone else an owner, first. Your memberships and sessions end.
          */
         post: operations["deleteAccount"];
         delete?: never;
@@ -878,6 +935,8 @@ export interface operations {
                             displayName: string | null;
                             /** Format: date-time */
                             createdAt: string;
+                            /** @description False for accounts that only sign in with Google or GitHub */
+                            hasPassword: boolean;
                         };
                         workspaces: {
                             /** Format: uuid */
@@ -1061,6 +1120,8 @@ export interface operations {
                             displayName: string | null;
                             /** Format: date-time */
                             createdAt: string;
+                            /** @description False for accounts that only sign in with Google or GitHub */
+                            hasPassword: boolean;
                         };
                         workspaces: {
                             /** Format: uuid */
@@ -1211,6 +1272,72 @@ export interface operations {
                         };
                     };
                 };
+            };
+        };
+    };
+    oauthProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Providers whose buttons the dashboard shows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        providers: ("google" | "github")[];
+                    };
+                };
+            };
+        };
+    };
+    oauthStart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: "google" | "github";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description To the provider, or back to /login with oauth_error */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    oauthCallback: {
+        parameters: {
+            query?: {
+                code?: string;
+                state?: string;
+                error?: string;
+            };
+            header?: never;
+            path: {
+                provider: "google" | "github";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description To the dashboard */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -1553,6 +1680,8 @@ export interface operations {
                             displayName: string | null;
                             /** Format: date-time */
                             createdAt: string;
+                            /** @description False for accounts that only sign in with Google or GitHub */
+                            hasPassword: boolean;
                         };
                         workspaces: {
                             /** Format: uuid */
@@ -1838,6 +1967,8 @@ export interface operations {
                             displayName: string | null;
                             /** Format: date-time */
                             createdAt: string;
+                            /** @description False for accounts that only sign in with Google or GitHub */
+                            hasPassword: boolean;
                         };
                         workspaces: {
                             /** Format: uuid */
@@ -2252,7 +2383,8 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    password: string;
+                    password?: string;
+                    email?: string;
                 };
             };
         };

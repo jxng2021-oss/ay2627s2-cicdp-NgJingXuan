@@ -26,7 +26,11 @@ export function findUserById(
 
 export async function insertUser(
   db: Database,
-  values: { email: string; passwordHash: string },
+  values: {
+    email: string;
+    passwordHash: string | null;
+    displayName?: string | null;
+  },
 ): Promise<User | undefined> {
   const [user] = await db
     .insert(users)
