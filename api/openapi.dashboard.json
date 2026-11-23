@@ -77,7 +77,8 @@
                         "id",
                         "email",
                         "displayName",
-                        "createdAt"
+                        "createdAt",
+                        "hasPassword"
                       ],
                       "properties": {
                         "id": {
@@ -94,6 +95,10 @@
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "hasPassword": {
+                          "type": "boolean",
+                          "description": "False for accounts that only sign in with Google or GitHub"
                         }
                       },
                       "additionalProperties": false
@@ -458,7 +463,8 @@
                         "id",
                         "email",
                         "displayName",
-                        "createdAt"
+                        "createdAt",
+                        "hasPassword"
                       ],
                       "properties": {
                         "id": {
@@ -475,6 +481,10 @@
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "hasPassword": {
+                          "type": "boolean",
+                          "description": "False for accounts that only sign in with Google or GitHub"
                         }
                       },
                       "additionalProperties": false
@@ -781,6 +791,125 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/dashboard/v1/auth/oauth/providers": {
+      "get": {
+        "operationId": "oauthProviders",
+        "summary": "The sign in providers that are set up",
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "Providers whose buttons the dashboard shows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "providers"
+                  ],
+                  "properties": {
+                    "providers": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "google",
+                          "github"
+                        ]
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/v1/auth/oauth/{provider}/start": {
+      "get": {
+        "operationId": "oauthStart",
+        "summary": "Continue with Google or GitHub",
+        "tags": [
+          "Auth"
+        ],
+        "description": "A browser navigation, not a fetch: redirects to the provider with a state and a PKCE challenge, kept in a short signed cookie.",
+        "parameters": [
+          {
+            "schema": {
+              "enum": [
+                "google",
+                "github"
+              ]
+            },
+            "in": "path",
+            "name": "provider",
+            "required": true
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "To the provider, or back to /login with oauth_error"
+          }
+        }
+      }
+    },
+    "/dashboard/v1/auth/oauth/{provider}/callback": {
+      "get": {
+        "operationId": "oauthCallback",
+        "summary": "Where the provider sends the browser back",
+        "tags": [
+          "Auth"
+        ],
+        "description": "Checks the state, exchanges the code (with the PKCE verifier) on the server, reads the provider's verified email, links or creates the account, starts a session and redirects to the dashboard. Failures redirect to /login?oauth_error=cancelled|failed|email_unverified|disabled|unavailable.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "in": "query",
+            "name": "code",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 256
+            },
+            "in": "query",
+            "name": "state",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 256
+            },
+            "in": "query",
+            "name": "error",
+            "required": false
+          },
+          {
+            "schema": {
+              "enum": [
+                "google",
+                "github"
+              ]
+            },
+            "in": "path",
+            "name": "provider",
+            "required": true
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "To the dashboard"
           }
         }
       }
@@ -1393,7 +1522,8 @@
                         "id",
                         "email",
                         "displayName",
-                        "createdAt"
+                        "createdAt",
+                        "hasPassword"
                       ],
                       "properties": {
                         "id": {
@@ -1410,6 +1540,10 @@
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "hasPassword": {
+                          "type": "boolean",
+                          "description": "False for accounts that only sign in with Google or GitHub"
                         }
                       },
                       "additionalProperties": false
@@ -1964,7 +2098,8 @@
                         "id",
                         "email",
                         "displayName",
-                        "createdAt"
+                        "createdAt",
+                        "hasPassword"
                       ],
                       "properties": {
                         "id": {
@@ -1981,6 +2116,10 @@
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "hasPassword": {
+                          "type": "boolean",
+                          "description": "False for accounts that only sign in with Google or GitHub"
                         }
                       },
                       "additionalProperties": false
@@ -2786,21 +2925,24 @@
         "tags": [
           "Account"
         ],
-        "description": "Needs your password. Refused while you are the only owner of a workspace: delete it, or make someone else an owner, first. Your memberships and sessions end.",
+        "description": "Needs your password, or, for an account without one (Google or GitHub only), your email address typed again. Refused while you are the only owner of a workspace: delete it, or make someone else an owner, first. Your memberships and sessions end.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "password"
-                ],
                 "properties": {
                   "password": {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 128
+                  },
+                  "email": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 254,
+                    "pattern": "^[^\\s@]+@[^\\s@]+$"
                   }
                 },
                 "additionalProperties": false

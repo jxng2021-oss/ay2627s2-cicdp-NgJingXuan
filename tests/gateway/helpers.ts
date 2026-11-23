@@ -22,6 +22,7 @@ import {
   type Database,
 } from "../../services/gateway/src/db/client.js";
 import * as schema from "../../services/gateway/src/db/schema.js";
+import type { OAuthSettings } from "../../services/gateway/src/services/oauth.service.js";
 
 export const ADMIN_TOKEN = "test-admin-token-0123456789abcdef0123456789";
 export const API_KEY_HASH_SECRET =
@@ -107,6 +108,12 @@ export class FakeAudit {
   );
 }
 
+export const TEST_OAUTH: OAuthSettings = {
+  redirectOrigin: "https://api.test",
+  google: { clientId: "google-client-id", clientSecret: "google-secret" },
+  github: { clientId: "github-client-id", clientSecret: "github-secret" },
+};
+
 export const AUDIT_TOKEN = "test-audit-token-gateway-0123456789abcdef";
 export const SESSION_SECRET = "test-session-secret-0123456789abcdef0123";
 export const DASHBOARD_ORIGIN = "https://dashboard.test";
@@ -136,6 +143,7 @@ export async function startGateway(
         cookieSecure: true,
       },
       authLimits: { perIp: 1_000, perEmail: 1_000 },
+      oauth: TEST_OAUTH,
     },
     rateLimitStore: new MemoryRateLimitStore(),
     adminToken: ADMIN_TOKEN,

@@ -232,6 +232,13 @@ dc exec -it secrets secrets-operator unseal
 
 Then open `https://NAME.duckdns.org`, sign up and use the dashboard.
 
+## 10. Continue with Google and GitHub
+
+The sign in pages can offer Continue with Google and Continue with GitHub.
+Their client IDs and secrets go only in
+`/etc/secure-cloud-platform/secrets.env`: see docs/google-github-sign-in.md.
+Until they are there, the buttons are hidden; everything else works.
+
 ## Every later change
 
 Merge to `main`. CI tests it, publishes the images and deploys them; only

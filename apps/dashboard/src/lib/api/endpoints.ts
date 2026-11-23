@@ -26,6 +26,7 @@ import {
   type FileList,
   type FileMetadata,
   type Me,
+  type OAuthProvider,
   type SessionList,
   type WorkspaceSummary,
   type NewApiKey,
@@ -58,6 +59,13 @@ export const auth = {
       clearCsrfToken();
       return me;
     }),
+  oauthProviders: () =>
+    request<{ providers: OAuthProvider[] }>(
+      "GET",
+      `${API_BASE}/auth/oauth/providers`,
+    ),
+  oauthStartUrl: (provider: OAuthProvider) =>
+    apiUrl(`${API_BASE}/auth/oauth/${provider}/start`),
   me: () => request<Me>("GET", `${API_BASE}/auth/me`),
   logout: () =>
     request<void>("POST", `${API_BASE}/auth/logout`).finally(clearCsrfToken),
@@ -80,9 +88,9 @@ export const account = {
       "DELETE",
       `${API_BASE}/account/sessions/${encodeURIComponent(sessionId)}`,
     ),
-  deleteAccount: (password: string) =>
+  deleteAccount: (confirm: { password: string } | { email: string }) =>
     request<void>("POST", `${API_BASE}/account/delete`, {
-      json: { password },
+      json: confirm,
     }).finally(clearCsrfToken),
   createWorkspace: (workspaceName: string) =>
     request<WorkspaceSummary>("POST", `${API_BASE}/workspaces`, {

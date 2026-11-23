@@ -90,7 +90,7 @@ export default function UserPoolsPage() {
   return (
     <>
       <PageHeader
-        label="App services"
+        label="User management"
         title="User pools"
         description="Your app's own users: they sign up and sign in through the API, with signed tokens your app checks itself."
         actions={

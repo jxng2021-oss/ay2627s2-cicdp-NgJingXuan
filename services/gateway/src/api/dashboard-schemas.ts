@@ -116,6 +116,10 @@ const Me = Type.Object(
         email: Type.String(),
         displayName: Type.String({ nullable: true }),
         createdAt: Type.String({ format: "date-time" }),
+        hasPassword: Type.Boolean({
+          description:
+            "False for accounts that only sign in with Google or GitHub",
+        }),
       },
       { additionalProperties: false },
     ),
@@ -179,6 +183,63 @@ export const loginSchema = {
     ),
     ...authErrors,
   },
+};
+
+const OAuthProvider = Type.Enum(["google", "github"]);
+
+export const oauthProvidersSchema = {
+  operationId: "oauthProviders",
+  tags: ["Auth"],
+  summary: "The sign in providers that are set up",
+  response: {
+    200: {
+      description: "Providers whose buttons the dashboard shows",
+      content: {
+        "application/json": {
+          schema: Type.Object(
+            { providers: Type.Array(OAuthProvider) },
+            { additionalProperties: false },
+          ),
+        },
+      },
+    },
+  },
+};
+
+const OAuthParams = Type.Object(
+  { provider: OAuthProvider },
+  { additionalProperties: false },
+);
+const redirect = (description: string) => ({ description, type: "null" });
+
+export const oauthStartSchema = {
+  operationId: "oauthStart",
+  tags: ["Auth"],
+  summary: "Continue with Google or GitHub",
+  description:
+    "A browser navigation, not a fetch: redirects to the provider with a state and a PKCE challenge, kept in a short signed cookie.",
+  params: OAuthParams,
+  response: {
+    302: redirect("To the provider, or back to /login with oauth_error"),
+  },
+};
+
+export const oauthCallbackSchema = {
+  operationId: "oauthCallback",
+  tags: ["Auth"],
+  summary: "Where the provider sends the browser back",
+  description:
+    "Checks the state, exchanges the code (with the PKCE verifier) on the server, reads the provider's verified email, links or creates the account, starts a session and redirects to the dashboard. Failures redirect to /login?oauth_error=cancelled|failed|email_unverified|disabled|unavailable.",
+  params: OAuthParams,
+  querystring: Type.Object(
+    {
+      code: Type.Optional(Type.String({ maxLength: 2048 })),
+      state: Type.Optional(Type.String({ maxLength: 256 })),
+      error: Type.Optional(Type.String({ maxLength: 256 })),
+    },
+    { additionalProperties: true },
+  ),
+  response: { 302: redirect("To the dashboard") },
 };
 
 const noContent = (description: string) => ({ description, type: "null" });
@@ -319,7 +380,10 @@ export const revokeSessionSchema = {
 };
 
 export const DeleteAccountBody = Type.Object(
-  { password: Password },
+  {
+    password: Type.Optional(Password),
+    email: Type.Optional(Email),
+  },
   { additionalProperties: false },
 );
 
@@ -328,7 +392,7 @@ export const deleteAccountSchema = {
   tags: ["Account"],
   summary: "Delete your account",
   description:
-    "Needs your password. Refused while you are the only owner of a workspace: delete it, or make someone else an owner, first. Your memberships and sessions end.",
+    "Needs your password, or, for an account without one (Google or GitHub only), your email address typed again. Refused while you are the only owner of a workspace: delete it, or make someone else an owner, first. Your memberships and sessions end.",
   security,
   body: DeleteAccountBody,
   response: {

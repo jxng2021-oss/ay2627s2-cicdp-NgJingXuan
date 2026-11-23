@@ -79,7 +79,7 @@ export const membershipRole = pgEnum("membership_role", ["owner", "member"]);
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  passwordHash: text("password_hash"),
   displayName: text("display_name"),
   status: userStatus("status").notNull().default("active"),
   ...timestamps,
@@ -133,6 +133,26 @@ export const sessions = pgTable(
   (table) => [
     index("sessions_user_id_idx").on(table.userId),
     index("sessions_previous_refresh_idx").on(table.previousRefreshHash),
+  ],
+);
+
+export const oauthProvider = pgEnum("oauth_provider", ["google", "github"]);
+
+export const oauthIdentities = pgTable(
+  "oauth_identities",
+  {
+    provider: oauthProvider("provider").notNull(),
+    subject: text("subject").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.provider, table.subject] }),
+    index("oauth_identities_user_id_idx").on(table.userId),
   ],
 );
 

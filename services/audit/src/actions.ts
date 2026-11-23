@@ -157,6 +157,11 @@ export const ACTIONS = {
     chain: "tenant",
     sentBy: "gateway",
   },
+  "user.oauth_linked": {
+    resourceType: "user",
+    chain: "platform",
+    sentBy: "gateway",
+  },
   "user_pool.created": {
     resourceType: "user_pool",
     chain: "tenant",

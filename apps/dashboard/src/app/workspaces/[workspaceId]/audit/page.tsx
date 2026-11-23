@@ -66,7 +66,7 @@ export default function AuditPage() {
       />
       <p className="muted">
         What happens to a user pool&apos;s users is in its own log:{" "}
-        <Link href={`/workspaces/${id}/user-logs`}>User logs</Link>.
+        <Link href={`/workspaces/${id}/user-logs`}>User activity</Link>.
       </p>
       <AuditLog
         id="audit"

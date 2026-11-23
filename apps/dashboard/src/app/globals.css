@@ -1621,6 +1621,7 @@ code,
   list-style: none;
 }
 .dropdown-list a,
+.dropdown-list button,
 .dropdown-footer a,
 .dropdown-footer button {
   display: flex;
@@ -1641,6 +1642,7 @@ code,
   cursor: pointer;
 }
 .dropdown-list a:hover,
+.dropdown-list button:hover,
 .dropdown-footer a:hover,
 .dropdown-footer button:hover,
 .dropdown-list a[aria-current="page"] {

@@ -7,6 +7,7 @@ import type {
 import type { AuditClient } from "../../audit.js";
 import type { Database } from "../../db/client.js";
 import { sendError } from "../../errors.js";
+import type { HttpFetch, OAuthSettings } from "../../services/oauth.service.js";
 import type { ProxyPolicy } from "../../services/ssrf.service.js";
 import type { RateLimiter, RateLimitStore } from "../../rate-limit.js";
 import type { WorkspaceMembership } from "../../models/membership.model.js";
@@ -24,12 +25,14 @@ export interface DashboardSettings {
   origin: string;
   session: SessionSettings;
   authLimits: { perIp: number; perEmail: number };
+  oauth: OAuthSettings;
 }
 
 export interface DashboardOptions {
   db: Database;
   audit: AuditClient;
   dashboard: DashboardSettings;
+  oauthFetch: HttpFetch;
   limiters: { authPerIp: RateLimiter; authPerEmail: RateLimiter };
   warnRateLimitingDown: (log: FastifyBaseLogger, error: unknown) => void;
   apiKeyPrefix: string;

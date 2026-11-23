@@ -8,12 +8,19 @@ import {
   listMemberships,
   type WorkspaceMembership,
 } from "../models/membership.model.js";
+import { findOAuthUserId, insertOAuthIdentity } from "../models/oauth.model.js";
 import { revokeUserSessions } from "../models/session.model.js";
 import {
   findUserByEmail,
+  findUserById,
   insertUser,
   updatePasswordHash,
 } from "../models/user.model.js";
+import {
+  displayNameFrom,
+  type OAuthProfile,
+  type OAuthProviderId,
+} from "./oauth.service.js";
 import {
   hashPassword,
   passwordProblem,
@@ -118,7 +125,9 @@ export async function checkLogin(
     );
     return undefined;
   }
-  const ok = await verifyPassword(user.passwordHash, password);
+  const ok = user.passwordHash
+    ? await verifyPassword(user.passwordHash, password)
+    : await verifyAgainstDummy(password);
   if (!ok || user.status !== "active") {
     await recordInWorkspaces(
       db,
@@ -131,6 +140,59 @@ export async function checkLogin(
     return undefined;
   }
   return user;
+}
+
+export class OAuthAccountError extends Error {}
+
+export async function signInWithOAuth(
+  db: Database,
+  audit: AuditClient,
+  request: FastifyRequest,
+  provider: OAuthProviderId,
+  profile: OAuthProfile,
+): Promise<User | undefined> {
+  const linkedId = await findOAuthUserId(db, provider, profile.subject);
+  const user = linkedId
+    ? await findUserById(db, linkedId)
+    : await linkOrCreate(db, audit, request, provider, profile);
+  return user?.status === "active" ? user : undefined;
+}
+
+async function linkOrCreate(
+  db: Database,
+  audit: AuditClient,
+  request: FastifyRequest,
+  provider: OAuthProviderId,
+  profile: OAuthProfile,
+): Promise<User | undefined> {
+  const email = normaliseEmail(profile.email);
+  const existing = await findUserByEmail(db, email);
+  if (existing) {
+    await insertOAuthIdentity(db, {
+      provider,
+      subject: profile.subject,
+      userId: existing.id,
+    });
+    void audit.recordBestEffort(
+      userEvent(request, "user.oauth_linked", existing.id, undefined),
+      request.log,
+    );
+    return existing;
+  }
+  return db.transaction(async (tx) => {
+    const created = await insertUser(tx, {
+      email,
+      passwordHash: null,
+      displayName: displayNameFrom(profile.name),
+    });
+    if (!created) throw new OAuthAccountError();
+    await insertOAuthIdentity(tx, {
+      provider,
+      subject: profile.subject,
+      userId: created.id,
+    });
+    return created;
+  });
 }
 
 export async function setPassword(

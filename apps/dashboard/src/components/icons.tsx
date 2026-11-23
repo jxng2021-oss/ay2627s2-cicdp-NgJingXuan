@@ -9,6 +9,8 @@ import {
   Files,
   Flag,
   GearSix,
+  GithubLogo,
+  GoogleLogo,
   Key,
   List,
   ListMagnifyingGlass,
@@ -47,6 +49,8 @@ const ICONS = {
   "arrow-left": ArrowLeft,
   "arrow-right": ArrowRight,
   copy: Copy,
+  google: GoogleLogo,
+  github: GithubLogo,
 } satisfies Record<string, PhosphorIcon>;
 
 export type IconName = keyof typeof ICONS;

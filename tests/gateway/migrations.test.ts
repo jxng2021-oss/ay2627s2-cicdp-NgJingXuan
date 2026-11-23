@@ -33,6 +33,7 @@ describe("database migrations", () => {
     expect(await tableNames()).toEqual([
       "api_keys",
       "memberships",
+      "oauth_identities",
       "proxy_connections",
       "sessions",
       "tenants",

@@ -2,21 +2,73 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, type FormEvent } from "react";
-import { ApiError } from "@/lib/api/client";
+import { useEffect, useState, type FormEvent } from "react";
+import { ApiError, type OAuthProvider } from "@/lib/api/client";
 import { auth } from "@/lib/api/endpoints";
 import { safeNext } from "@/lib/safe-redirect";
 import { useMarkSignedIn } from "@/lib/session";
 import { FEATURES } from "@/lib/features";
 import { Icon } from "./icons";
 import { GatewayMock } from "./marketing/gateway-mock";
-import { Button, Field, FormError } from "./ui";
+import { Banner, Button, Field, FormError } from "./ui";
 
 const MIN_PASSWORD = 12;
 
+const PROVIDER_NAMES: Record<OAuthProvider, string> = {
+  google: "Google",
+  github: "GitHub",
+};
+
+const OAUTH_ERRORS: Record<string, [string, string]> = {
+  cancelled: [
+    "Sign in was cancelled",
+    "You closed the Google or GitHub window. Try again when you're ready.",
+  ],
+  failed: [
+    "Couldn't sign you in",
+    "Google or GitHub didn't finish signing you in. Try again.",
+  ],
+  email_unverified: [
+    "Your email isn't verified",
+    "Verify your email address with Google or GitHub first, then try again.",
+  ],
+  disabled: ["This account is disabled", "It can't sign in."],
+  unavailable: [
+    "That sign in option isn't available",
+    "Use another way to sign in.",
+  ],
+  rate_limited: ["Too many attempts", "Wait a minute, then try again."],
+};
+
+function ProviderButtons({ providers }: { providers: OAuthProvider[] }) {
+  if (providers.length === 0) return null;
+  return (
+    <>
+      <div className="oauth-buttons">
+        {providers.map((provider) => (
+          <a
+            key={provider}
+            className="button"
+            data-variant="secondary"
+            href={auth.oauthStartUrl(provider)}
+          >
+            <Icon name={provider} />
+            Continue with {PROVIDER_NAMES[provider]}
+          </a>
+        ))}
+      </div>
+      <p className="auth-divider caption-5">
+        <span>or with your email</span>
+      </p>
+    </>
+  );
+}
+
 export function AuthForm({ mode }: { mode: "login" | "sign-up" }) {
   const router = useRouter();
-  const next = safeNext(useSearchParams().get("next"));
+  const params = useSearchParams();
+  const next = safeNext(params.get("next"));
+  const oauthError = OAUTH_ERRORS[params.get("oauth_error") ?? ""];
   const markSignedIn = useMarkSignedIn();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,7 +76,21 @@ export function AuthForm({ mode }: { mode: "login" | "sign-up" }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<unknown>();
   const [busy, setBusy] = useState(false);
+  const [providers, setProviders] = useState<OAuthProvider[]>([]);
   const signUp = mode === "sign-up";
+
+  useEffect(() => {
+    let active = true;
+    auth
+      .oauthProviders()
+      .then((found) => {
+        if (active) setProviders(found.providers);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function validate(): Record<string, string> {
     const found: Record<string, string> = {};
@@ -101,6 +167,12 @@ export function AuthForm({ mode }: { mode: "login" | "sign-up" }) {
                 : "Log in to manage your workspace's keys, secrets and files."}
             </p>
           </div>
+          {oauthError && (
+            <Banner title={oauthError[0]} tone="destructive">
+              {oauthError[1]}
+            </Banner>
+          )}
+          <ProviderButtons providers={providers} />
           <form
             className="form"
             onSubmit={(event) => void submit(event)}

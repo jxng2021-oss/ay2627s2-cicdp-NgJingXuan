@@ -11,6 +11,7 @@ import {
   expectError,
   FakeAudit,
   startGateway,
+  TEST_OAUTH,
 } from "./helpers.js";
 
 let db: Database;
@@ -658,5 +659,6 @@ function dashboardSettings() {
       cookieSecure: true,
     },
     authLimits: { perIp: 1_000, perEmail: 1_000 },
+    oauth: TEST_OAUTH,
   };
 }

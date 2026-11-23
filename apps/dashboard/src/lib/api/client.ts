@@ -43,6 +43,7 @@ export function clearCsrfToken(): void {
 const PUBLIC_PATHS = new Set([
   `${API_BASE}/auth/login`,
   `${API_BASE}/auth/sign-up`,
+  `${API_BASE}/auth/oauth/providers`,
 ]);
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -196,6 +197,11 @@ type Json<
 
 type W = "/dashboard/v1/workspaces/{workspaceId}";
 export type Me = Json<"/dashboard/v1/auth/me", "get", 200>;
+export type OAuthProvider = Json<
+  "/dashboard/v1/auth/oauth/providers",
+  "get",
+  200
+>["providers"][number];
 export type WorkspaceSummary = Me["workspaces"][number];
 export type SessionList = Json<"/dashboard/v1/account/sessions", "get", 200>;
 export type SessionInfo = SessionList["sessions"][number];

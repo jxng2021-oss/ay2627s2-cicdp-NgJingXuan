@@ -664,6 +664,27 @@
 .auth-back:hover {
   color: var(--foreground);
 }
+.oauth-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.oauth-buttons .button {
+  width: 100%;
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  color: var(--ink-muted);
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--hairline);
+}
 
 @media (max-width: 1024px) {
   .proof-grid {
