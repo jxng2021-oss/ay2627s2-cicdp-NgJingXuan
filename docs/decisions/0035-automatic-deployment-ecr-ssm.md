@@ -23,7 +23,7 @@ That had three problems for a CI/CD project:
 Every push to `main` that passes CI deploys itself:
 
 ```
-push to main → CI (every job) → ci-success → publish → deploy
+push to main → CI/CD pipeline: 1.x and 2.x checks → 3. All checks passed → 4. Publish images to ECR → 5. Deploy to EC2
 ```
 
 - **publish** builds the seven server images from the same Docker layer
