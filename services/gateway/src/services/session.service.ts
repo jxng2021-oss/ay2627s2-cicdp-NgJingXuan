@@ -19,8 +19,7 @@ import {
 export interface SessionSettings {
   secret: string;
   accessTtlMs: number;
-  idleTimeoutMs: number;
-  absoluteTimeoutMs: number;
+  refreshTtlMs: number;
   refreshGraceMs: number;
   cookieSecure: boolean;
 }
@@ -70,7 +69,7 @@ export async function startSession(
   const access = newToken();
   const refresh = newToken();
   const now = Date.now();
-  const expiresAt = new Date(now + settings.absoluteTimeoutMs);
+  const expiresAt = new Date(now + settings.refreshTtlMs);
   await insertSession(db, {
     userId,
     tokenHash: hashToken(access),
@@ -151,13 +150,10 @@ export interface ActiveSession {
 
 function stillAlive(
   found: { session: Session; user: User },
-  settings: SessionSettings,
   now: number,
 ): boolean {
   return (
-    found.user.status === "active" &&
-    found.session.expiresAt.getTime() > now &&
-    found.session.lastUsedAt.getTime() + settings.idleTimeoutMs > now
+    found.user.status === "active" && found.session.expiresAt.getTime() > now
   );
 }
 
@@ -175,7 +171,7 @@ export async function currentSession(
     if (
       found &&
       found.session.accessExpiresAt.getTime() > now &&
-      stillAlive(found, settings, now)
+      stillAlive(found, now)
     ) {
       if (now - found.session.lastUsedAt.getTime() > 60_000) {
         await touchSession(db, found.session.id);
@@ -191,7 +187,7 @@ export async function currentSession(
   }
   const refreshHash = hashToken(refresh);
   const found = await findSessionByRefresh(db, refreshHash);
-  if (!found || !stillAlive(found, settings, now)) {
+  if (!found || !stillAlive(found, now)) {
     clearSessionCookie(reply, settings);
     return undefined;
   }
@@ -199,21 +195,16 @@ export async function currentSession(
   if (found.session.refreshHash === refreshHash) {
     const nextAccess = newToken();
     const nextRefresh = newToken();
+    const expiresAt = new Date(now + settings.refreshTtlMs);
     const rotated = await rotateSession(db, found.session.id, refreshHash, {
       tokenHash: hashToken(nextAccess),
       accessExpiresAt: new Date(now + settings.accessTtlMs),
       refreshHash: hashToken(nextRefresh),
       previousRefreshUntil: new Date(now + settings.refreshGraceMs),
+      expiresAt,
     });
     if (rotated) {
-      setSessionCookies(
-        reply,
-        settings,
-        nextAccess,
-        nextRefresh,
-        found.session.expiresAt,
-      );
-      return found;
+      setSessionCookies(reply, settings, nextAccess, nextRefresh, expiresAt);
     }
     return found;
   }

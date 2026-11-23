@@ -218,10 +218,7 @@ export function authController(options: DashboardOptions) {
 
     sessions: async (request: FastifyRequest) => {
       const { user, session: current } = request.dashboardSession!;
-      const sessions = await account.listSessions(
-        user.id,
-        settings.idleTimeoutMs,
-      );
+      const sessions = await account.listSessions(user.id);
       return {
         sessions: sessions.map((s) => ({
           id: s.id,

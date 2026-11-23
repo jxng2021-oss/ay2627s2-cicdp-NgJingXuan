@@ -131,8 +131,7 @@ export async function startGateway(
       session: {
         secret: SESSION_SECRET,
         accessTtlMs: 15 * 60_000,
-        idleTimeoutMs: 30 * 60_000,
-        absoluteTimeoutMs: 12 * 60 * 60_000,
+        refreshTtlMs: 30 * 24 * 60 * 60_000,
         refreshGraceMs: 30_000,
         cookieSecure: true,
       },

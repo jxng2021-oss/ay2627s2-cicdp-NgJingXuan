@@ -243,18 +243,23 @@ describe("sign-up and login", () => {
 });
 
 describe("sessions expire", () => {
-  it("after the idle timeout (the refresh token can't revive it)", async () => {
-    await start({
+  const sleep = (ms: number) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+  const withTtls = (accessTtlMs: number, refreshTtlMs: number) =>
+    start({
       dashboard: {
         ...dashboardSettings(),
-        session: { ...dashboardSettings().session, idleTimeoutMs: 200 },
+        session: { ...dashboardSettings().session, accessTtlMs, refreshTtlMs },
       },
     });
+
+  it("only when the refresh token's lifetime passes without the dashboard being used", async () => {
+    await withTtls(100, 300);
     const browser = new Browser(app);
-    await browser.signUp("idle@example.com");
+    await browser.signUp("unused@example.com");
     expect((await browser.request("GET", `${AUTH}/me`)).statusCode).toBe(200);
 
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await sleep(400);
 
     expectError(
       await browser.request("GET", `${AUTH}/me`),
@@ -263,25 +268,29 @@ describe("sessions expire", () => {
     );
   });
 
-  it("after the absolute timeout, even while in use", async () => {
-    await start({
-      dashboard: {
-        ...dashboardSettings(),
-        session: { ...dashboardSettings().session, absoluteTimeoutMs: 300 },
-      },
-    });
+  it("each refresh gives the new refresh token a fresh lifetime, so a session in use never ends", async () => {
+    await withTtls(100, 400);
     const browser = new Browser(app);
-    await browser.signUp("absolute@example.com");
+    await browser.signUp("in-use@example.com");
+    const first = browser.refresh;
 
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    for (let i = 0; i < 5; i++) {
+      await sleep(250);
+      expect((await browser.request("GET", `${AUTH}/me`)).statusCode).toBe(200);
+    }
+
+    expect(browser.refresh).toBeDefined();
+    expect(browser.refresh).not.toBe(first);
+  });
+
+  it("there is no idle limit: a session left alone for longer than the access token still renews", async () => {
+    await withTtls(100, 60_000);
+    const browser = new Browser(app);
+    await browser.signUp("left-open@example.com");
+
+    await sleep(500);
+
     expect((await browser.request("GET", `${AUTH}/me`)).statusCode).toBe(200);
-    await new Promise((resolve) => setTimeout(resolve, 200));
-
-    expectError(
-      await browser.request("GET", `${AUTH}/me`),
-      401,
-      "UNAUTHORIZED",
-    );
   });
 });
 
@@ -387,7 +396,7 @@ describe("silent refresh (on the server, no refresh route)", () => {
 });
 
 describe("cookies", () => {
-  it("are HttpOnly, Secure and limited to /dashboard: a short access cookie, and a SameSite=Strict refresh cookie until the absolute timeout", async () => {
+  it("are HttpOnly, Secure and limited to /dashboard: a 15-minute access cookie, and a 30-day SameSite=Strict refresh cookie", async () => {
     const browser = new Browser(app);
     await browser.signUp("cookie@example.com");
 
@@ -396,7 +405,7 @@ describe("cookies", () => {
       /^__Secure-scp_session=[A-Za-z0-9_-]{43}; Path=\/dashboard; Max-Age=900; HttpOnly; SameSite=Lax; Secure$/,
     );
     expect(browser.lastSetCookies[1]).toMatch(
-      /^__Secure-scp_refresh=[A-Za-z0-9_-]{43}; Path=\/dashboard; Max-Age=(43199|43200); HttpOnly; SameSite=Strict; Secure$/,
+      /^__Secure-scp_refresh=[A-Za-z0-9_-]{43}; Path=\/dashboard; Max-Age=(2591999|2592000); HttpOnly; SameSite=Strict; Secure$/,
     );
     expect(browser.refresh).not.toBe(browser.cookie);
   });
@@ -644,8 +653,7 @@ function dashboardSettings() {
     session: {
       secret: "test-session-secret-0123456789abcdef0123",
       accessTtlMs: 15 * 60_000,
-      idleTimeoutMs: 30 * 60_000,
-      absoluteTimeoutMs: 12 * 60 * 60_000,
+      refreshTtlMs: 30 * 24 * 60 * 60_000,
       refreshGraceMs: 30_000,
       cookieSecure: true,
     },

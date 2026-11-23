@@ -146,12 +146,8 @@ export function parseDashboard(
     session: {
       secret: secret(env, "SESSION_SECRET"),
       accessTtlMs: number("SESSION_ACCESS_TTL_MS", 15 * 60_000),
-      idleTimeoutMs: number("SESSION_IDLE_TIMEOUT_MS", 30 * 60_000),
+      refreshTtlMs: number("SESSION_REFRESH_TTL_MS", 30 * 24 * 60 * 60_000),
       refreshGraceMs: DEFAULT_REFRESH_GRACE_MS,
-      absoluteTimeoutMs: number(
-        "SESSION_ABSOLUTE_TIMEOUT_MS",
-        12 * 60 * 60_000,
-      ),
       cookieSecure,
     },
     authLimits: {

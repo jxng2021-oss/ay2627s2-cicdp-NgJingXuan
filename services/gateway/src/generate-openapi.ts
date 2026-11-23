@@ -12,8 +12,7 @@ const app = buildApp({
     session: {
       secret: "not-used-for-generating-the-specification",
       accessTtlMs: 1,
-      idleTimeoutMs: 1,
-      absoluteTimeoutMs: 1,
+      refreshTtlMs: 1,
       refreshGraceMs: 1,
       cookieSecure: true,
     },

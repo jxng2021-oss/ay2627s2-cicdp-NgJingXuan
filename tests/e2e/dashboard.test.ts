@@ -60,7 +60,7 @@ const email = (name: string) =>
 
 beforeAll(freshWindow);
 
-describe("silent refresh (docs/decisions/0024)", () => {
+describe("silent refresh (docs/decisions/0037)", () => {
   it("an expired access token is renewed by the gateway within the request, and the CSRF token keeps working", async () => {
     const browser = new Browser();
     await browser.signUp(email("refresh"));
@@ -73,6 +73,7 @@ describe("silent refresh (docs/decisions/0024)", () => {
     expect(browser.setCookies).toHaveLength(2);
     expect(browser.jar.get("scp_session")).not.toBe(before.get("scp_session"));
     expect(browser.jar.get("scp_refresh")).not.toBe(before.get("scp_refresh"));
+    expect(browser.setCookies[1]).toMatch(/; Max-Age=(2591999|2592000);/);
     const logout = await browser.call("POST", "/auth/logout");
     expect(logout.status).toBe(204);
 
@@ -94,7 +95,7 @@ describe("the dashboard API", () => {
       /^scp_session=[A-Za-z0-9_-]{43}; Path=\/dashboard; Max-Age=\d+; HttpOnly; SameSite=Lax$/,
     );
     expect(owner.setCookies[1]).toMatch(
-      /^scp_refresh=[A-Za-z0-9_-]{43}; Path=\/dashboard; Max-Age=\d+; HttpOnly; SameSite=Strict$/,
+      /^scp_refresh=[A-Za-z0-9_-]{43}; Path=\/dashboard; Max-Age=(2591999|2592000); HttpOnly; SameSite=Strict$/,
     );
 
     const ws = `/workspaces/${workspace}`;
