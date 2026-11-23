@@ -3,7 +3,7 @@
 Every push to `main` that passes CI is deployed automatically (ADR 0035):
 
 ```
-push to main → CI → ci-success → publish (images to ECR) → deploy (Systems Manager runs deploy.sh)
+push to main → 1.x and 2.x checks → 3. All checks passed → 4. Publish images to ECR → 5. Deploy to EC2 (Systems Manager runs deploy.sh)
 ```
 
 The server runs everything with Docker Compose. Caddy is the only thing the
@@ -189,13 +189,13 @@ The repository → **Settings → Secrets and variables → Actions → Variable
 | `DEPLOY_PATH`         | optional; default `/home/ubuntu/secure-cloud`                                                               |
 | `PROXY_ALLOWED_HOSTS` | optional; outside hosts the proxy route may call, e.g. `api.example.com,abc123.mock.pstmn.io` (empty: none) |
 
-Until `AWS_DEPLOY_ROLE_ARN` is set, the publish and deploy jobs skip
+Until `AWS_DEPLOY_ROLE_ARN` is set, "4. Publish images to ECR" and "5. Deploy to EC2" skip
 themselves.
 
 ## 8. The first deploy
 
-GitHub → **Actions → CI → Run workflow** on `main` (or push to `main`). After
-every CI job passes, **publish** pushes the images and **deploy** runs
+GitHub → **Actions → CI/CD pipeline → Run workflow** on `main` (or push to `main`). After
+every check passes, **4. Publish images to ECR** pushes the images and **5. Deploy to EC2** runs
 `deploy.sh` on the server. The first run also generates the server's
 passwords and keys (in `/etc/secure-cloud-platform/secrets.env`, root only,
 never printed). Caddy gets the certificates within a minute.
