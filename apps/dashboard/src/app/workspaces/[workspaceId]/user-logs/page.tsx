@@ -55,8 +55,8 @@ function UserLogs() {
 
   const header = (
     <PageHeader
-      label="User pools"
-      title="User logs"
+      label="User management"
+      title="User activity"
       description="Each user pool's own tamper-evident log: sign ups, sign ins, lockouts, password resets and role changes. Kept apart from the workspace's audit log."
     />
   );

@@ -19,7 +19,7 @@ adds things, and anything breaking would get a new version (`/v2/...`).
 ### Changed
 
 - New user pool events (`pool_user.*`, `pool_role.*`) are recorded in each
-  pool's own log, shown in the dashboard under User pools → User logs, and no
+  pool's own log, shown in the dashboard under User management → User activity, and no
   longer appear in `GET /v1/audit-events`. Events recorded before stay there
   (docs/decisions/0036).
 

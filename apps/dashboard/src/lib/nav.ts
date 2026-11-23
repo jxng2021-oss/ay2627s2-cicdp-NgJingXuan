@@ -45,12 +45,12 @@ export const WORKSPACE_NAV: NavGroup[] = [
     items: [
       {
         path: "/user-pools",
-        label: "User pools",
+        label: "User management",
         icon: "users",
         feature: "pools",
         children: [
-          { path: "/user-pools", label: "Users" },
-          { path: "/user-logs", label: "User logs" },
+          { path: "/user-pools", label: "User pools" },
+          { path: "/user-logs", label: "User activity" },
         ],
       },
       {
