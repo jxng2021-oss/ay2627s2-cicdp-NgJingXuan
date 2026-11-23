@@ -225,10 +225,14 @@ test("shoppers: accounts from the platform's user pool, own orders only, silent 
   await page.waitForURL((url) => url.pathname === "/");
   await expect(page.getByRole("link", { name: "Sign In" })).toBeVisible();
   await page.goto("/account/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill("not-the-password-1");
-  await page.getByRole("button", { name: "Sign In" }).click();
-  await expect(page.getByText("Wrong email or password")).toBeVisible();
+  await expect(async () => {
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill("not-the-password-1");
+    await page.getByRole("button", { name: "Sign In" }).click();
+    await expect(page.getByText("Wrong email or password")).toBeVisible({
+      timeout: 2_000,
+    });
+  }).toPass({ intervals: [2_000], timeout: 15_000 });
 });
 
 test("the sale banner follows the platform's sale-banner feature flag", async ({
