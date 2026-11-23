@@ -30,8 +30,7 @@ export function accountService(db: Database, audit: AuditClient) {
     setDisplayName: (userId: string, name: string | null) =>
       updateDisplayName(db, userId, name),
 
-    listSessions: (userId: string, idleTimeoutMs: number) =>
-      listUserSessions(db, userId, idleTimeoutMs),
+    listSessions: (userId: string) => listUserSessions(db, userId),
 
     endSession: (sessionId: string) => revokeSession(db, sessionId),
 

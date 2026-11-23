@@ -60,6 +60,7 @@ export async function rotateSession(
     accessExpiresAt: Date;
     refreshHash: string;
     previousRefreshUntil: Date;
+    expiresAt: Date;
   },
 ): Promise<boolean> {
   const rows = await db
@@ -110,9 +111,7 @@ export async function revokeUserSessions(
 export function listUserSessions(
   db: Database,
   userId: string,
-  idleTimeoutMs: number,
 ): Promise<Session[]> {
-  const now = new Date();
   return db
     .select()
     .from(sessions)
@@ -120,8 +119,7 @@ export function listUserSessions(
       and(
         eq(sessions.userId, userId),
         isNull(sessions.revokedAt),
-        gt(sessions.expiresAt, now),
-        gt(sessions.lastUsedAt, new Date(now.getTime() - idleTimeoutMs)),
+        gt(sessions.expiresAt, new Date()),
       ),
     )
     .orderBy(desc(sessions.lastUsedAt));
