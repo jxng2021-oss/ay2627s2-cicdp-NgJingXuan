@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Frame, type Page } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
@@ -46,6 +46,36 @@ async function signUpShopper(page: Page): Promise<string> {
   return email;
 }
 
+async function stripeCardForm(page: Page): Promise<Frame> {
+  await page.waitForURL(/^https:\/\/checkout\.stripe\.com\//, {
+    timeout: 30_000,
+  });
+  for (let attempt = 0; attempt < 60; attempt++) {
+    for (const frame of page.frames()) {
+      const found = await frame
+        .locator("#payment-numberInput")
+        .count()
+        .catch(() => 0);
+      if (found > 0) return frame;
+    }
+    await page.waitForTimeout(500);
+  }
+  throw new Error("Stripe's card form didn't appear");
+}
+
+async function payOnStripe(
+  page: Page,
+  cardNumber = "4242424242424242",
+): Promise<Frame> {
+  const card = await stripeCardForm(page);
+  await card.locator("#payment-numberInput").fill(cardNumber);
+  await card.locator("#payment-expiryInput").fill("12 / 34");
+  await card.locator("#payment-cvcInput").fill("123");
+  await card.locator("#payment-nameInput").fill("Test Shopper");
+  await card.getByTestId("payment-form-submit-button").click();
+  return card;
+}
+
 async function expectAccessible(page: Page) {
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
@@ -67,7 +97,7 @@ test("admin needs the admin login, and shows the platform is connected", async (
 
   await admin.goto("/admin");
   await expect(admin.getByRole("heading", { name: "Platform" })).toBeVisible();
-  for (const card of ["API key", "Payment key", "Payments connection"]) {
+  for (const card of ["API key", "Payment key", "Stripe connection"]) {
     await expect(admin.getByRole("region", { name: card })).not.toContainText(
       /Missing|Not set up|Not working/,
     );
@@ -94,32 +124,67 @@ test("a product photo is uploaded, stored on the platform, and shown in the shop
   await expectAccessible(page);
 });
 
-test("checkout pays through the platform's connection and saves a signed receipt", async ({
+test("checkout pays on Stripe's page through the platform's connection, and the order is kept in the shop's own database", async ({
   page,
 }) => {
-  await signUpShopper(page);
+  const email = await signUpShopper(page);
   await page.goto("/products/field-notebook");
   await expectAccessible(page);
   await page.getByLabel("Quantity").selectOption("2");
   await page.getByRole("button", { name: "Buy Now" }).click();
+  const returned = page.waitForRequest(
+    /\/orders\/complete\?session_id=cs_test_/,
+    {
+      timeout: 60_000,
+    },
+  );
+  await payOnStripe(page);
 
-  await page.waitForURL(/\/orders\/[0-9a-f-]{36}$/);
+  const completeUrl = (await returned).url();
+  await page.waitForURL(/\/orders\/[0-9a-f-]{36}$/, { timeout: 60_000 });
   await expect(
     page.getByRole("heading", { name: "Thank you for your order" }),
   ).toBeVisible();
   await expect(page.getByText("S$36.00").first()).toBeVisible();
-  await expect(page.getByText(/^ch_[0-9a-f]{32}$/)).toBeVisible();
+  await expect(page.getByText(/^pi_[A-Za-z0-9]{10,}$/)).toBeVisible();
+  await expect(page.getByText("Paid with Stripe")).toBeVisible();
   await expect(
-    page.getByText("Stored encrypted on secure-cloud"),
+    page.getByText("Kept in the demo shop's own database"),
   ).toBeVisible();
-  const receiptId = page.url().split("/orders/")[1]!;
+  const orderId = page.url().split("/orders/")[1]!;
+
+  await page.goto(completeUrl);
+  await page.waitForURL(/\/orders\/[0-9a-f-]{36}$/);
+  expect(page.url().split("/orders/")[1]).toBe(orderId);
+  await page.goto("/account/orders");
+  await expect(
+    page.getByRole("list", { name: "Your orders" }).getByRole("link"),
+  ).toHaveCount(1);
 
   await admin.goto("/admin/orders");
-  await expect(
-    admin.getByRole("row", { name: /receipt-.*\.json/ }).first(),
-  ).toBeVisible();
-  const asImage = await page.request.get(`/images/${receiptId}`);
-  expect(asImage.status()).toBe(404);
+  const row = admin
+    .getByRole("table", { name: "Orders" })
+    .getByRole("row", { name: new RegExp(email) });
+  await expect(row).toContainText("2 x Field Notebook");
+  await expect(row).toContainText("Paid");
+  await expect(row).toContainText(/pi_[A-Za-z0-9]{10,}/);
+});
+
+test("Stripe's declined test card stays on Stripe's page, and no order is made", async ({
+  page,
+}) => {
+  await signUpShopper(page);
+  await page.goto("/products/field-notebook");
+  await page.getByRole("button", { name: "Buy Now" }).click();
+  const card = await payOnStripe(page, "4000000000000002");
+  await expect(card.getByText(/declined/i).first()).toBeVisible({
+    timeout: 30_000,
+  });
+  expect(page.url()).toMatch(/^https:\/\/checkout\.stripe\.com\//);
+
+  await page.goto("/account/orders?payment=unpaid");
+  await expect(page.getByText("Payment not completed")).toBeVisible();
+  await expect(page.getByText("No orders yet.")).toBeVisible();
 });
 
 test("the platform's payment policy blocks an order over S$500, before the key is used", async ({
@@ -193,7 +258,8 @@ test("shoppers: accounts from the platform's user pool, own orders only, silent 
   await expectAccessible(page);
   await page.goto("/products/field-notebook");
   await page.getByRole("button", { name: "Buy Now" }).click();
-  await page.waitForURL(/\/orders\/[0-9a-f-]{36}$/);
+  await payOnStripe(page);
+  await page.waitForURL(/\/orders\/[0-9a-f-]{36}$/, { timeout: 60_000 });
   const order = new URL(page.url()).pathname;
   await page.getByRole("link", { name: "My Orders" }).click();
   await expect(

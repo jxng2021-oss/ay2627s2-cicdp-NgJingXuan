@@ -123,6 +123,10 @@ describe("connection policies", () => {
       "audit",
       `select row_to_json(e)::text from audit_events e where tenant_id = '${tenantId}'`,
     );
-    expect(rows.output).not.toMatch(/(?<![0-9a-f])501(?![0-9a-f])/i);
+    const withoutTimes = rows.output.replace(
+      /\d{4}-\d{2}-\d{2}[T ][\d:.]+(Z|[+-]\d{2}(:\d{2})?)?/g,
+      "",
+    );
+    expect(withoutTimes).not.toMatch(/(?<![0-9a-f])501(?![0-9a-f])/i);
   });
 });

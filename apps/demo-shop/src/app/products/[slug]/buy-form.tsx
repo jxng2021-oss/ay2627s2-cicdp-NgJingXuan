@@ -32,6 +32,10 @@ export function BuyForm({ slug }: { slug: string }) {
           )}
         </select>
       </div>
+      <p className="hint">
+        You pay on Stripe&apos;s secure page (test mode, no real money: card
+        4242 4242 4242 4242, any future date and CVC).
+      </p>
       {state.error && <ErrorBanner error={state.error} />}
       {state.signIn && (
         <p>
@@ -52,7 +56,7 @@ export function BuyForm({ slug }: { slug: string }) {
           data-variant="primary"
           disabled={pending}
         >
-          {pending ? "Paying..." : "Buy Now"}
+          {pending ? "Going to Stripe..." : "Buy Now"}
         </button>
       </div>
     </form>

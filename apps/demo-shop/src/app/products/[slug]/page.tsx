@@ -3,16 +3,19 @@ import { notFound } from "next/navigation";
 import { ErrorBanner } from "@/components/ui";
 import { findProduct, formatPrice } from "@/lib/catalog";
 import { latestImages } from "@/lib/images";
-import { describeError } from "@/lib/messages";
+import { describeError, paymentProblem } from "@/lib/messages";
 import { listFiles, type FileInfo } from "@/lib/platform/client";
 import { ProductPhoto } from "../../product-photo";
 import { BuyForm } from "./buy-form";
 
 export default async function ProductPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const cancelled = paymentProblem((await searchParams).payment);
   const product = findProduct((await params).slug);
   if (!product) notFound();
 
@@ -30,6 +33,7 @@ export default async function ProductPage({
         <Link href="/">← All products</Link>
       </p>
       {problem && <ErrorBanner error={problem} />}
+      {cancelled && <ErrorBanner error={cancelled} />}
       <div className="product-detail">
         <ProductPhoto file={photo} name={product.name} />
         <div className="section">

@@ -35,6 +35,7 @@ check(
 );
 for (const [service, port] of [
   ["postgres", "5432"],
+  ["demo-shop-db", "5432"],
   ["storage", "3001"],
   ["secrets", "3002"],
   ["mock-upstream", "4000"],

@@ -242,6 +242,63 @@ describe("connection policies", () => {
     });
   });
 
+  it("reads the amount from a form body too (like Stripe), and passes the body on unchanged", async () => {
+    await saveConnection(POLICY);
+    const form = "application/x-www-form-urlencoded";
+
+    for (const bad of [
+      "amount=501&currency=sgd",
+      "currency=sgd",
+      "amount=100&amount=1",
+      "amount=1.5",
+      "amount=-5",
+      "amount=0100",
+    ]) {
+      expectError(
+        await call("POST", "/charges", bad, form),
+        403,
+        "PROXY_POLICY_DENIED",
+      );
+    }
+    expect(secretReads).toBe(0);
+
+    const ok = await call(
+      "POST",
+      "/charges",
+      "amount=500&currency=sgd&metadata[order]=7",
+      `${form}; charset=utf-8`,
+    );
+    expect(ok.statusCode).toBe(201);
+    expect(outsideCalls[0]!.body).toBe(
+      "amount=500&currency=sgd&metadata[order]=7",
+    );
+  });
+
+  it("a form field with brackets works too, like Stripe Checkout's price", async () => {
+    const field = "line_items[0][price_data][unit_amount]";
+    const saved = await saveConnection({
+      amountLimit: { field, maxPerRequest: 500, maxPerDay: 1000 },
+    });
+    expect(saved.statusCode).toBe(201);
+    const form = "application/x-www-form-urlencoded";
+
+    expectError(
+      await call("POST", "/checkout", `${field}=501&mode=payment`, form),
+      403,
+      "PROXY_POLICY_DENIED",
+    );
+    const encoded = new URLSearchParams({ [field]: "500", mode: "payment" });
+    const ok = await call("POST", "/checkout", encoded.toString(), form);
+    expect(ok.statusCode).toBe(201);
+    expectError(
+      await saveConnection({
+        amountLimit: { field: "a[b", maxPerRequest: 1, maxPerDay: 1 },
+      }),
+      400,
+      "BAD_REQUEST",
+    );
+  });
+
   it("keeps a daily total, gives back failed calls, and starts again the next day", async () => {
     await saveConnection(POLICY);
     expect((await call("POST", "/charges", { amount: 400 })).statusCode).toBe(
@@ -330,6 +387,24 @@ describe("policy rules", () => {
     expect(routeAllowed(policy, "GET", "/charges/ch_1/refunds")).toBe(false);
     expect(routeAllowed(policy, "DELETE", "/charges/ch_1")).toBe(false);
     expect(routeAllowed({}, "DELETE", "/anything")).toBe(true);
+  });
+
+  it("reads only whole, positive amounts from a form body, once", () => {
+    const form = (text: string) =>
+      amountFrom(
+        Buffer.from(text),
+        "amount",
+        "application/x-www-form-urlencoded",
+      );
+    expect(form("amount=250&currency=sgd")).toBe(250);
+    expect(form("currency=sgd")).toBeUndefined();
+    expect(form("amount=250&amount=1")).toBeUndefined();
+    expect(form("amount=2.5")).toBeUndefined();
+    expect(form("amount=0")).toBeUndefined();
+    expect(form(`amount=${2 ** 60}`)).toBeUndefined();
+    expect(
+      amountFrom(Buffer.from("amount=250"), "amount", "text/plain"),
+    ).toBeUndefined();
   });
 
   it("reads only whole, positive amounts from a JSON object", () => {

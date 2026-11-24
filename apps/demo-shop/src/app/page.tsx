@@ -3,7 +3,7 @@ import { ErrorBanner, PageHeader } from "@/components/ui";
 import { formatPrice, PRODUCTS } from "@/lib/catalog";
 import { latestImages } from "@/lib/images";
 import { describeError } from "@/lib/messages";
-import { evaluateFlags, listFiles, type FileInfo } from "@/lib/platform/client";
+import { flagIsOn, listFiles, type FileInfo } from "@/lib/platform/client";
 import { currentShopper } from "@/lib/shoppers";
 import { ProductPhoto } from "./product-photo";
 
@@ -18,11 +18,7 @@ export default async function HomePage() {
   const shopper = await currentShopper();
   let sale = false;
   try {
-    const flags = await evaluateFlags({
-      key: shopper?.id ?? "visitor",
-      attributes: { signedIn: shopper !== undefined },
-    });
-    sale = flags["sale-banner"]?.value === true;
+    sale = await flagIsOn("sale-banner", shopper);
   } catch {}
 
   return (

@@ -11,7 +11,7 @@ import { currentShopper } from "@/lib/shoppers";
 export const metadata: Metadata = {
   title: "Demo Shop",
   description:
-    "A demo shop that stores its photos, receipts and keys on secure-cloud.",
+    "A demo shop that keeps its photos and keys on secure-cloud and pays with Stripe through it.",
   robots: { index: false, follow: false },
 };
 
@@ -52,8 +52,9 @@ export default async function RootLayout({
         <main className="shop-main">{children}</main>
         <footer className="shop-footer">
           <p className="muted">
-            A demo customer of secure-cloud: photos, receipts, keys and shopper
-            accounts are kept on the platform. Test data only.
+            A demo customer of secure-cloud: photos, keys and shopper accounts
+            are kept on the platform; orders are in the shop&apos;s own
+            database. Test data only.
           </p>
         </footer>
       </body>

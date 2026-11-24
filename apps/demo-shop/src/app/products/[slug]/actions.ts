@@ -4,9 +4,14 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { findProduct, parseQuantity } from "@/lib/catalog";
 import { describeError, type ErrorView } from "@/lib/messages";
-import { charge } from "@/lib/payments";
-import { uploadFile } from "@/lib/platform/client";
-import { receiptFileName, type Receipt } from "@/lib/receipts";
+import {
+  attachCheckoutSession,
+  createOrder,
+  dropUnstartedOrder,
+  type Db,
+} from "@/lib/orders";
+import { startCheckout } from "@/lib/payments";
+import { shopDb } from "@/lib/shop-db";
 import { currentShopper } from "@/lib/shoppers";
 
 export interface CheckoutState {
@@ -40,52 +45,44 @@ export async function checkout(
       signIn: true,
     };
   }
-  const totalCents = product.priceCents * quantity;
 
-  let fileId: string;
+  let url: string;
+  let db: Db | undefined;
+  let orderId: string | undefined;
   try {
-    const payment = await charge(totalCents, `${quantity} x ${product.name}`);
-    if (!payment.ok) {
+    db = await shopDb();
+    const order = await createOrder(db, {
+      id: randomUUID(),
+      shopper,
+      slug: product.slug,
+      productName: product.name,
+      quantity,
+      unitCents: product.priceCents,
+    });
+    orderId = order.id;
+    const started = await startCheckout({
+      orderId: order.id,
+      slug: product.slug,
+      name: product.name,
+      quantity,
+      totalCents: order.totalCents,
+      shopper,
+    });
+    if (!started.ok) {
+      await dropUnstartedOrder(db, order.id);
       return {
-        error:
-          payment.reason === "declined"
-            ? {
-                title: "Payment declined",
-                message:
-                  "The payment provider declined this order. Try a smaller order.",
-              }
-            : {
-                title: "Payment failed",
-                message: `The payment provider answered ${payment.status}. Nothing was charged; retry later.`,
-              },
+        error: {
+          title: "Couldn't start the payment",
+          message: `Stripe answered ${started.status}. Nothing was charged; retry later.`,
+        },
       };
     }
-
-    const receipt: Receipt = {
-      version: 1,
-      orderId: randomUUID(),
-      createdAt: new Date().toISOString(),
-      items: [
-        {
-          slug: product.slug,
-          name: product.name,
-          quantity,
-          unitCents: product.priceCents,
-        },
-      ],
-      totalCents,
-      currency: "sgd",
-      chargeId: payment.chargeId,
-      shopper,
-    };
-    const saved = await uploadFile(
-      receiptFileName(receipt.orderId, shopper.id),
-      "application/json",
-      JSON.stringify(receipt),
-    );
-    fileId = saved.id;
+    await attachCheckoutSession(db, order.id, started.sessionId);
+    url = started.url;
   } catch (error) {
+    if (db && orderId)
+      await dropUnstartedOrder(db, orderId).catch(() => undefined);
     return { error: describeError(error) };
   }
-  redirect(`/orders/${fileId}`);
+  redirect(url);
 }
