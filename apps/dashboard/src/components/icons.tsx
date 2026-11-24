@@ -23,6 +23,7 @@ import {
   SquaresFour,
   Sun,
   Users,
+  WebhooksLogo,
   X,
 } from "@phosphor-icons/react/ssr";
 
@@ -31,6 +32,7 @@ const ICONS = {
   keys: Key,
   secrets: LockKey,
   connections: PlugsConnected,
+  webhooks: WebhooksLogo,
   files: Files,
   audit: ListMagnifyingGlass,
   settings: GearSix,

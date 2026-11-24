@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { loadConfig } from "../../services/gateway/src/config.js";
 
@@ -33,6 +34,32 @@ describe("dashboard and admin settings", () => {
         SESSION_COOKIE_SECURE: "false",
       }),
     ).toThrow(/SESSION_COOKIE_SECURE/);
+  });
+
+  it("need an EC P-256 webhook signing key in production; elsewhere one is made at start", () => {
+    expect(() => loadConfig({ ...BASE, NODE_ENV: "production" })).toThrow(
+      /WEBHOOK_SIGNING_KEY must be set/,
+    );
+    expect(() =>
+      loadConfig({
+        ...BASE,
+        WEBHOOK_SIGNING_KEY: Buffer.from("not a key").toString("base64"),
+      }),
+    ).toThrow(/WEBHOOK_SIGNING_KEY/);
+    const rsa = generateKeyPairSync("rsa", { modulusLength: 2048 })
+      .privateKey.export({ type: "pkcs8", format: "der" })
+      .toString("base64");
+    expect(() => loadConfig({ ...BASE, WEBHOOK_SIGNING_KEY: rsa })).toThrow(
+      /EC P-256/,
+    );
+    const ec = generateKeyPairSync("ec", { namedCurve: "P-256" })
+      .privateKey.export({ type: "pkcs8", format: "der" })
+      .toString("base64");
+    expect(
+      loadConfig({ ...BASE, NODE_ENV: "production", WEBHOOK_SIGNING_KEY: ec })
+        .webhookSigningKey.asymmetricKeyType,
+    ).toBe("ec");
+    expect(loadConfig(BASE).webhookSigningKey.asymmetricKeyType).toBe("ec");
   });
 
   it("need a session secret and a plain origin", () => {

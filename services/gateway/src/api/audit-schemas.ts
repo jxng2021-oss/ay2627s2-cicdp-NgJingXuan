@@ -55,6 +55,9 @@ export const TENANT_AUDIT_ACTIONS = [
   "feature_flag.toggled",
   "feature_flag.deleted",
   "secret.revealed",
+  "webhook_endpoint.created",
+  "webhook_endpoint.updated",
+  "webhook_endpoint.deleted",
 ] as const;
 
 export const TENANT_RESOURCE_TYPES = [
@@ -69,6 +72,7 @@ export const TENANT_RESOURCE_TYPES = [
   "pool_user",
   "pool_role",
   "feature_flag",
+  "webhook_endpoint",
 ] as const;
 
 const OUTCOMES = ["success", "denied", "failure"] as const;

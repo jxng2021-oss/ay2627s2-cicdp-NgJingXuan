@@ -52,6 +52,7 @@ for (const size of [
       ["Secrets", "Secrets"],
       ["Files", "Files"],
       ["Connections", "Connections"],
+      ["Webhooks", "Webhooks"],
       ["User pools", "User pools"],
       ["User activity", "User activity"],
       ["Feature flags", "Feature flags"],

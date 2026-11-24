@@ -54,3 +54,15 @@ OPTIONS /v1/proxy/{connection}/{*} added the new `PROXY_RATE_LIMITED` enum value
 # clients yet (prototype; the demo shop, the only client, is updated in the
 # same change), so this is done as a reviewed exception rather than /v2.
 GET /v1/secrets/{name} removed the required property `value` from the response with the `200` status
+
+# 2026-11-24, webhooks (docs/decisions/0040, KAN-145), to be approved in the
+# PR review by the project owner.
+# WHY: creating, changing and deleting a webhook endpoint are audited like
+# proxy connections, so the audit log's action and resource type lists gain
+# webhook_endpoint values. Only new values are added to lists that already
+# grow with every feature; existing values and the response shape are
+# unchanged, and clients reading the log should ignore values they don't know.
+GET /v1/audit-events added the new `webhook_endpoint` enum value to the `events/items/resourceType` response property for the response status `200`
+GET /v1/audit-events added the new `webhook_endpoint.created` enum value to the `events/items/action` response property for the response status `200`
+GET /v1/audit-events added the new `webhook_endpoint.deleted` enum value to the `events/items/action` response property for the response status `200`
+GET /v1/audit-events added the new `webhook_endpoint.updated` enum value to the `events/items/action` response property for the response status `200`

@@ -81,6 +81,16 @@ try {
             "0",
             "userPool() got something that isn't a pool ID.",
           ],
+          [
+            "INVALID_ENVIRONMENT",
+            "0",
+            "flags() got something other than development, staging or production (check SECURE_CLOUD_ENVIRONMENT).",
+          ],
+          [
+            "UNEXPECTED_RESPONSE",
+            "any",
+            "The gateway answered something the SDK didn't expect, like a proxy's error page. Check SECURE_CLOUD_URL points at the gateway.",
+          ],
         ]}
       />
 
@@ -93,6 +103,26 @@ try {
             "Something you sent isn't valid; the message says what.",
           ],
           ["UNAUTHORIZED", "401", "From signIn(): a wrong email or password."],
+          [
+            "INVALID_ROUTE",
+            "0",
+            'From connections.call(): the route isn\'t like "POST /charges". Nothing was sent.',
+          ],
+          [
+            "FILE_NOT_FOUND",
+            "0",
+            "From files.upload(): there is no file at that path.",
+          ],
+          [
+            "MISSING_USER_ID",
+            "0",
+            "From flags: the user has no id. Pass { id: user.id }.",
+          ],
+          [
+            "INVALID_WEBHOOK_SIGNATURE",
+            "401",
+            "From webhooks.verify(): the event isn't signed by secure-cloud, or is too old. Answer 401.",
+          ],
           [
             "INVALID_TOKEN",
             "401",

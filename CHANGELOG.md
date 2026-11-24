@@ -15,6 +15,23 @@ adds things, and anything breaking would get a new version (`/v2/...`).
   every pool user: `true` after a workspace owner reset the user's password.
   Send the user to choose a new one with
   `POST /v1/user-pools/{poolId}/users/{userId}/password`, which clears it.
+- A connection's amount limit also reads form bodies
+  (`application/x-www-form-urlencoded`, like Stripe's API), not only JSON. The
+  amount field must appear once, as a whole positive number; otherwise the
+  call is refused with `PROXY_POLICY_DENIED` before the secret is read. The
+  amount field may use form-style brackets, like
+  `line_items[0][price_data][unit_amount]` (docs/decisions/0039).
+- Payment webhooks (docs/decisions/0040):
+  - `POST /v1/webhooks/{endpointId}`: Stripe sends its events here (no API
+    key; Stripe's `Stripe-Signature` is checked with the endpoint's
+    signing secret). Unknown endpoints and bad signatures get the same 401.
+  - `GET /v1/webhooks/keys`: secure-cloud's public keys (JWKS, ES256, no API
+    key) for checking the `X-SecureCloud-Signature` of delivered events.
+  - `GET /v1/webhook-events?after=&endpointId=`: pull the workspace's clean
+    events (`payment.succeeded`, `payment.failed`, `refund.succeeded`) with
+    an API key, oldest first.
+  - The audit log has three new actions, `webhook_endpoint.created`,
+    `.updated` and `.deleted`, and the resource type `webhook_endpoint`.
 
 ### Changed
 

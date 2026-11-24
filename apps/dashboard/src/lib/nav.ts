@@ -38,6 +38,12 @@ export const WORKSPACE_NAV: NavGroup[] = [
         icon: "connections",
         feature: "connections",
       },
+      {
+        path: "/webhooks",
+        label: "Webhooks",
+        icon: "webhooks",
+        feature: "connections",
+      },
     ],
   },
   {

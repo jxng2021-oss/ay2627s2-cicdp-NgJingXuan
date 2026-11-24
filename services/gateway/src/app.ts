@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, type KeyObject } from "node:crypto";
 import { createServer, type RequestListener } from "node:http";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
@@ -21,6 +21,9 @@ import { installErrorHandling, sendError } from "./errors.js";
 import { rateLimitingDownWarning, type RateLimitSettings } from "./limits.js";
 import { loggerOptions, logRequests } from "./logging.js";
 import type { HttpFetch } from "./services/oauth.service.js";
+import { createWebhookService } from "./services/webhook.service.js";
+import { webhookSigner } from "./services/webhook-signing.service.js";
+import { webhookPublicRoutes } from "./routes/webhooks.routes.js";
 import { RateLimiter, type RateLimitStore } from "./rate-limit.js";
 import { adminRoutes } from "./routes/admin.routes.js";
 import {
@@ -60,6 +63,8 @@ export interface GatewayAppOptions {
   openApiDocument?: "public" | "dashboard";
   dashboard: DashboardSettings;
   oauthFetch?: HttpFetch;
+  webhookSigningKey: KeyObject;
+  webhookDeliveryIntervalMs?: number;
   adminApiEnabled?: boolean;
   proxy: ProxyPolicy;
   resolver?: Resolver;
@@ -137,6 +142,40 @@ export function buildApp(options: GatewayAppOptions): FastifyInstance {
     new RateLimiter(rateLimitStore, name, limit, rateLimits.windowMs);
   const warnRateLimitingDown = rateLimitingDownWarning();
 
+  const signer = webhookSigner(options.webhookSigningKey);
+  const webhookService = createWebhookService({
+    db: options.db,
+    signer,
+    secretsUrl: options.secretsUrl,
+    policy: options.proxy,
+    resolver: options.resolver ?? systemResolver,
+    connectTimeoutMs: options.connectTimeoutMs,
+    responseTimeoutMs: options.responseTimeoutMs,
+  });
+  const webhooks = {
+    webhooks: webhookService,
+    signer,
+    failuresPerIp: limiter("webhook-failed-ip", rateLimits.failedAuthPerIp),
+    warnRateLimitingDown,
+  };
+  let deliveryTimer: NodeJS.Timeout | undefined;
+  app.addHook("onReady", (done) => {
+    const every = options.webhookDeliveryIntervalMs ?? 0;
+    if (every > 0) {
+      deliveryTimer = setInterval(() => {
+        webhookService.deliverDue(app.log).catch((error: unknown) => {
+          app.log.warn({ err: error }, "webhook deliveries couldn't run");
+        });
+      }, every);
+      deliveryTimer.unref();
+    }
+    done();
+  });
+  app.addHook("onClose", async () => {
+    clearInterval(deliveryTimer);
+    await webhookService.close();
+  });
+
   app.register((routes, _opts, done) => {
     const api = routes.withTypeProvider<TypeBoxTypeProvider>();
 
@@ -169,6 +208,7 @@ export function buildApp(options: GatewayAppOptions): FastifyInstance {
       prefix: "/dashboard/v1",
       ...options,
       oauthFetch: options.oauthFetch ?? fetch,
+      webhooks: webhookService,
       limiters: {
         authPerIp: limiter("auth-ip", options.dashboard.authLimits.perIp),
         authPerEmail: limiter(
@@ -186,9 +226,12 @@ export function buildApp(options: GatewayAppOptions): FastifyInstance {
       responseTimeoutMs: options.responseTimeoutMs,
     });
 
+    routes.register(webhookPublicRoutes, { prefix: "/v1", ...webhooks });
+
     routes.register(publicApiV1, {
       prefix: "/v1",
       ...options,
+      webhooks,
       resolver: options.resolver ?? systemResolver,
       limiters: {
         perKey: limiter("key", rateLimits.requestsPerKey),

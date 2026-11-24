@@ -144,6 +144,14 @@ export async function fakeSecrets() {
       shredded.add(tenant);
       return { status: 204, headers: noStore };
     }
+    const injection = /^\/internal\/secrets\/([^/]+)$/.exec(path);
+    if (injection && req.method === "GET") {
+      const name = decodeURIComponent(injection[1]!);
+      const value = values.get(key(req, name));
+      return value === undefined
+        ? serviceError(req, 404, "NOT_FOUND", noStore)
+        : json(200, { name, version: 1, value });
+    }
     if (path === "/secrets" && req.method === "GET") {
       const secrets = [...values.keys()]
         .filter((k) => k.startsWith(`${tenant}/`))

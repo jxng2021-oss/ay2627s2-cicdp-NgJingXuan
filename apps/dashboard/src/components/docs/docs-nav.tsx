@@ -9,6 +9,8 @@ export const DOCS_PAGES = [
   { href: "/docs/files", label: "Files" },
   { href: "/docs/user-pools", label: "User sign in" },
   { href: "/docs/roles", label: "Roles and permissions" },
+  { href: "/docs/flags", label: "Feature flags" },
+  { href: "/docs/webhooks", label: "Payment webhooks" },
   { href: "/docs/express", label: "Express helpers" },
   { href: "/docs/errors", label: "Errors" },
 ];

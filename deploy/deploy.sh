@@ -31,6 +31,13 @@ install -d -m 0700 "$(dirname "$SECRETS_FILE")"
       echo "$name=$(random_hex)" >>"$SECRETS_FILE"
     fi
   done
+  if ! grep -q "^WEBHOOK_SIGNING_KEY=" "$SECRETS_FILE"; then
+    echo "Generating WEBHOOK_SIGNING_KEY in $SECRETS_FILE."
+    key="$(openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 |
+      openssl pkcs8 -topk8 -nocrypt -outform DER | base64 -w0)"
+    [[ -n "$key" ]] || fail "could not generate WEBHOOK_SIGNING_KEY (is openssl installed?)"
+    echo "WEBHOOK_SIGNING_KEY=$key" >>"$SECRETS_FILE"
+  fi
 )
 chmod 0600 "$SECRETS_FILE"
 

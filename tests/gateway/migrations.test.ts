@@ -38,6 +38,8 @@ describe("database migrations", () => {
       "sessions",
       "tenants",
       "users",
+      "webhook_endpoints",
+      "webhook_events",
     ]);
   });
 

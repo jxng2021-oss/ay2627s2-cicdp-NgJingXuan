@@ -34,6 +34,9 @@ import {
   type SecretList,
   type SecretVersions,
   type Usage,
+  type WebhookEndpoint,
+  type WebhookEndpointList,
+  type WebhookEventList,
 } from "./client";
 
 export interface PoolSettings {
@@ -178,6 +181,29 @@ export const workspace = {
     request<void>(
       "DELETE",
       ws(id, `/proxy-connections/${name(connectionName)}`),
+    ),
+
+  webhooks: (id: string) =>
+    request<WebhookEndpointList>("GET", ws(id, "/webhooks")),
+  createWebhook: (
+    id: string,
+    body: {
+      name: string;
+      signingSecretName: string;
+      forwardUrl: string | null;
+    },
+  ) => request<WebhookEndpoint>("POST", ws(id, "/webhooks"), { json: body }),
+  deleteWebhook: (id: string, endpointId: string) =>
+    request<void>("DELETE", ws(id, `/webhooks/${name(endpointId)}`)),
+  webhookEvents: (id: string, endpointId: string) =>
+    request<WebhookEventList>(
+      "GET",
+      ws(id, `/webhooks/${name(endpointId)}/events`),
+    ),
+  redeliverWebhookEvent: (id: string, endpointId: string, eventId: string) =>
+    request<void>(
+      "POST",
+      ws(id, `/webhooks/${name(endpointId)}/events/${name(eventId)}/redeliver`),
     ),
 
   pools: (id: string) => request<PoolList>("GET", ws(id, "/user-pools")),

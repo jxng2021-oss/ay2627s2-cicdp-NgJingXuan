@@ -1,8 +1,10 @@
 import { Connections } from "./connections.js";
 import { SecureCloudError } from "./errors.js";
 import { Files } from "./files.js";
+import { Flags, flagEnvironment, type FlagEnvironment } from "./flags.js";
 import { Http } from "./http.js";
 import { UserPool } from "./user-pools.js";
+import { Webhooks } from "./webhooks.js";
 
 export interface SecureCloudOptions {
   apiKey?: string;
@@ -14,8 +16,10 @@ export interface SecureCloudOptions {
 export class SecureCloud {
   readonly connections: Connections;
   readonly files: Files;
+  readonly webhooks: Webhooks;
   private readonly http: Http;
   private readonly pools = new Map<string, UserPool>();
+  private readonly flagClients = new Map<FlagEnvironment, Flags>();
 
   constructor(options: SecureCloudOptions = {}) {
     const apiKey = options.apiKey ?? process.env.SECURE_CLOUD_API_KEY;
@@ -46,6 +50,17 @@ export class SecureCloud {
     });
     this.connections = new Connections(this.http);
     this.files = new Files(this.http);
+    this.webhooks = new Webhooks(this.http);
+  }
+
+  flags(environment?: FlagEnvironment): Flags {
+    const name = flagEnvironment(environment);
+    let client = this.flagClients.get(name);
+    if (!client) {
+      client = new Flags(this.http, name);
+      this.flagClients.set(name, client);
+    }
+    return client;
   }
 
   userPool(poolId: string): UserPool {
@@ -65,6 +80,14 @@ export class SecureCloud {
 export { SecureCloudError, isSecureCloudError } from "./errors.js";
 export { errorHandler } from "./express.js";
 export type { CallOptions, ProxyResponse } from "./connections.js";
+export type { VerifyOptions, WebhookEvent } from "./webhooks.js";
+export type {
+  FlagEnvironment,
+  FlagResult,
+  FlagUser,
+  FlagValue,
+  Flags,
+} from "./flags.js";
 export type {
   FileInfo,
   MulterFile,

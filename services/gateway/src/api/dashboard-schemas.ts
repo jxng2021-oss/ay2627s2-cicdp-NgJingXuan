@@ -1428,3 +1428,194 @@ export const removePoolUserRoleSchema = poolRoute(
     response: { 200: json("The user", PoolUserSchema), ...ownerErrors },
   },
 );
+
+const webhookTags = ["Webhooks"];
+const webhookErrors = {
+  400: error("BAD_REQUEST: invalid input.", "BAD_REQUEST", "Invalid input"),
+  401: notSignedIn,
+  404: error(
+    "NOT_FOUND: no such workspace, endpoint or event (or you aren't a member).",
+    "NOT_FOUND",
+    "Webhook endpoint not found",
+  ),
+  409: workspaceDeleting,
+};
+const webhookOwnerErrors = { ...webhookErrors, 403: ownersOnly };
+const webhookRoute = <T extends object>(
+  operationId: string,
+  summary: string,
+  owner: boolean,
+  extra: T,
+) => ({
+  operationId,
+  tags: webhookTags,
+  summary: summary + (owner ? " (owners only)" : ""),
+  security,
+  ...extra,
+});
+
+const WebhookEndpointSchema = Type.Object(
+  {
+    id: Type.String({ format: "uuid" }),
+    name: Type.String(),
+    provider: Type.Enum(["stripe"]),
+    signingSecretName: Type.String({
+      description:
+        "The secure-cloud secret holding Stripe's signing secret (whsec_...)",
+    }),
+    forwardUrl: Type.String({
+      nullable: true,
+      description: "Where secure-cloud pushes events; null: the dev app pulls",
+    }),
+    stripeUrl: Type.String({
+      description: "Paste this into Stripe as the webhook endpoint URL",
+    }),
+    createdAt: Type.String({ format: "date-time" }),
+  },
+  { additionalProperties: false },
+);
+const WebhookEndpointParams = Type.Object({
+  workspaceId: Type.String({ pattern: UUID }),
+  endpointId: Type.String({ pattern: UUID }),
+});
+const ForwardUrl = Type.Union([
+  Type.String({ minLength: 1, maxLength: 2048 }),
+  Type.Null(),
+]);
+const SigningSecretName = Type.String({
+  pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+});
+
+export const listWebhookEndpointsSchema = webhookRoute(
+  "listWebhookEndpoints",
+  "The workspace's webhook endpoints",
+  false,
+  {
+    params: WorkspaceParams,
+    response: {
+      200: json(
+        "Endpoints",
+        Type.Object(
+          { endpoints: Type.Array(WebhookEndpointSchema) },
+          { additionalProperties: false },
+        ),
+      ),
+      ...webhookErrors,
+    },
+  },
+);
+
+export const createWebhookEndpointSchema = webhookRoute(
+  "createWebhookEndpoint",
+  "Create a webhook endpoint for Stripe",
+  true,
+  {
+    params: WorkspaceParams,
+    body: Type.Object(
+      {
+        name: Type.String({ pattern: "^[a-z0-9][a-z0-9-]{0,39}$" }),
+        signingSecretName: SigningSecretName,
+        forwardUrl: ForwardUrl,
+      },
+      { additionalProperties: false },
+    ),
+    response: {
+      201: json("Created", WebhookEndpointSchema),
+      ...webhookOwnerErrors,
+      409: error(
+        "CONFLICT: the name is taken, there are already 10 endpoints, or the workspace is being deleted.",
+        "CONFLICT",
+        "A webhook endpoint with this name already exists",
+      ),
+    },
+  },
+);
+
+export const updateWebhookEndpointSchema = webhookRoute(
+  "updateWebhookEndpoint",
+  "Change a webhook endpoint's signing secret or delivery address",
+  true,
+  {
+    params: WebhookEndpointParams,
+    body: Type.Object(
+      {
+        signingSecretName: Type.Optional(SigningSecretName),
+        forwardUrl: Type.Optional(ForwardUrl),
+      },
+      { additionalProperties: false },
+    ),
+    response: {
+      200: json("Changed", WebhookEndpointSchema),
+      ...webhookOwnerErrors,
+    },
+  },
+);
+
+export const deleteWebhookEndpointSchema = webhookRoute(
+  "deleteWebhookEndpoint",
+  "Delete a webhook endpoint and its events",
+  true,
+  {
+    params: WebhookEndpointParams,
+    response: {
+      204: { description: "Deleted", type: "null" },
+      ...webhookOwnerErrors,
+    },
+  },
+);
+
+const DeliveredEvent = Type.Object(
+  {
+    id: Type.String({ format: "uuid" }),
+    event: Type.String(),
+    providerEventId: Type.String(),
+    orderId: Type.String({ nullable: true }),
+    amount: Type.Integer({ nullable: true }),
+    currency: Type.String({ nullable: true }),
+    paymentId: Type.String({ nullable: true }),
+    reason: Type.String({ nullable: true }),
+    occurredAt: Type.String({ format: "date-time" }),
+    receivedAt: Type.String({ format: "date-time" }),
+    deliveryStatus: Type.Enum(["pending", "delivered", "failed", "pull"]),
+    attempts: Type.Integer(),
+    lastError: Type.String({ nullable: true }),
+    deliveredAt: Type.String({ format: "date-time", nullable: true }),
+  },
+  { additionalProperties: false },
+);
+
+export const listWebhookEndpointEventsSchema = webhookRoute(
+  "listWebhookEndpointEvents",
+  "An endpoint's latest events and their delivery",
+  false,
+  {
+    params: WebhookEndpointParams,
+    response: {
+      200: json(
+        "The latest 50 events, newest first",
+        Type.Object(
+          { events: Type.Array(DeliveredEvent) },
+          { additionalProperties: false },
+        ),
+      ),
+      ...webhookErrors,
+    },
+  },
+);
+
+export const redeliverWebhookEventSchema = webhookRoute(
+  "redeliverWebhookEvent",
+  "Send an event to the dev app again",
+  true,
+  {
+    params: Type.Object({
+      workspaceId: Type.String({ pattern: UUID }),
+      endpointId: Type.String({ pattern: UUID }),
+      eventId: Type.String({ pattern: UUID }),
+    }),
+    response: {
+      202: { description: "Queued for delivery", type: "null" },
+      ...webhookOwnerErrors,
+    },
+  },
+);
