@@ -13,6 +13,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "migrate": "node dist/migrate.js",
     "db:generate": "drizzle-kit generate"
   },
@@ -33,6 +34,7 @@
     "@electric-sql/pglite": "0.5.10",
     "@types/node": "22.20.5",
     "@types/pg": "8.23.1",
+    "@vitest/coverage-v8": "5.1.0",
     "drizzle-kit": "0.31.11",
     "typescript": "6.0.3",
     "vitest": "5.1.0"
