@@ -4,10 +4,10 @@ import type { FeatureId } from "./features";
 export interface NavLink {
   path: string;
   label: string;
+  icon: IconName;
 }
 
 export interface NavItem extends NavLink {
-  icon: IconName;
   feature?: FeatureId;
   children?: NavLink[];
 }
@@ -34,15 +34,13 @@ export const WORKSPACE_NAV: NavGroup[] = [
       },
       {
         path: "/connections",
-        label: "Connections",
-        icon: "connections",
+        label: "Third-party services",
+        icon: "services",
         feature: "connections",
-      },
-      {
-        path: "/webhooks",
-        label: "Webhooks",
-        icon: "webhooks",
-        feature: "connections",
+        children: [
+          { path: "/connections", label: "Connections", icon: "connections" },
+          { path: "/webhooks", label: "Webhooks", icon: "webhooks" },
+        ],
       },
     ],
   },
@@ -55,8 +53,8 @@ export const WORKSPACE_NAV: NavGroup[] = [
         icon: "users",
         feature: "pools",
         children: [
-          { path: "/user-pools", label: "User pools" },
-          { path: "/user-logs", label: "User activity" },
+          { path: "/user-pools", label: "User pools", icon: "pool" },
+          { path: "/user-logs", label: "User activity", icon: "activity" },
         ],
       },
       {

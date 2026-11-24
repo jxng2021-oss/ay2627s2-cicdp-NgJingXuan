@@ -10,6 +10,9 @@ adds things, and anything breaking would get a new version (`/v2/...`).
 
 ### Added
 
+- The `api_key.deleted` audit action in `GET /v1/audit-events`: a workspace
+  owner removed a revoked API key from the dashboard's list for good. The
+  key's earlier events stay in the log.
 - `passwordResetRequired` on the sign-in and refresh answers
   (`POST /v1/user-pools/{poolId}/sessions` and `.../sessions/refresh`) and on
   every pool user: `true` after a workspace owner reset the user's password.

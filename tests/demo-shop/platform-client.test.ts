@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { checkoutResult, startCheckout } from "@/lib/payments";
 import { listFiles, listSecrets, PlatformError } from "@/lib/platform/client";
+import { formatDate } from "@/components/ui";
 import { describeError } from "@/lib/messages";
 
 function reply(
@@ -66,7 +67,11 @@ describe("platform client", () => {
       code: "SECRETS_SEALED",
       requestId: "req-1",
     });
-    expect(describeError(error).title).toBe("Temporarily unavailable");
+    expect(describeError(error)).toEqual({
+      title: "Something went wrong",
+      message: "Try again in a moment.",
+      requestId: "req-1",
+    });
   });
 
   it("reports an unreachable platform, and a shop that isn't set up", async () => {
@@ -76,7 +81,7 @@ describe("platform client", () => {
     );
     const error: unknown = await listFiles().catch((e: unknown) => e);
     expect(error).toMatchObject({ code: "UNREACHABLE" });
-    expect(describeError(error).title).toBe("Platform unreachable");
+    expect(describeError(error).title).toBe("Something went wrong");
     vi.stubEnv("PLATFORM_API_KEY", "");
     await expect(listFiles()).rejects.toMatchObject({ code: "NOT_CONNECTED" });
   });
@@ -229,10 +234,12 @@ describe("Stripe Checkout through the connection", () => {
     );
     const error = await startCheckout(order(129_900)).catch((e: unknown) => e);
     expect(error).toMatchObject({ status: 403, code: "PROXY_POLICY_DENIED" });
-    expect(describeError(error)).toMatchObject({
+    const view = describeError(error);
+    expect(view).toMatchObject({
       title: "Blocked by the payment policy",
       requestId: "req-1",
     });
+    expect(view.message).not.toMatch(/S\$|key|Stripe/);
   });
 
   it("the platform's own refusals (sealed) are PlatformErrors", async () => {
@@ -243,5 +250,30 @@ describe("Stripe Checkout through the connection", () => {
     await expect(startCheckout(order(1800))).rejects.toMatchObject({
       code: "SECRETS_SEALED",
     });
+  });
+});
+
+describe("what customers are told", () => {
+  it("a refused API key or any setup problem is only 'Something went wrong'", () => {
+    for (const code of [
+      "INVALID_API_KEY",
+      "NOT_CONNECTED",
+      "SECRETS_SEALED",
+      "UNREACHABLE",
+      "SOMETHING_NEW",
+    ]) {
+      const view = describeError(
+        new PlatformError(401, code, "A valid API key is required", "req-9"),
+      );
+      expect(view).toEqual({
+        title: "Something went wrong",
+        message: "Try again in a moment.",
+        requestId: "req-9",
+      });
+    }
+  });
+
+  it("shows times in Singapore time, wherever the server runs", () => {
+    expect(formatDate("2026-11-24T12:01:00Z")).toContain("8:01");
   });
 });

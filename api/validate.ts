@@ -138,13 +138,19 @@ export class Contract {
     const parameters = operation.parameters ?? [];
     const problems: string[] = [];
 
+    const queryValue = (name: string, schema: unknown) => {
+      const values = query.getAll(name);
+      if (values.length === 0) return undefined;
+      const many = (schema as { type?: unknown } | undefined)?.type === "array";
+      return many ? values : values[0];
+    };
     for (const parameter of parameters) {
       const value =
         parameter.in === "header"
           ? headers[parameter.name.toLowerCase()]
           : parameter.in === "path"
             ? pathParams[parameter.name]
-            : (query.get(parameter.name) ?? undefined);
+            : queryValue(parameter.name, parameter.schema);
       if (value === undefined) {
         if (parameter.required) {
           problems.push(

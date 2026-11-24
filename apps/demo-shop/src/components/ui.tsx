@@ -53,5 +53,6 @@ export function formatDate(iso: string): string {
   return new Date(iso).toLocaleString("en-SG", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "Asia/Singapore",
   });
 }

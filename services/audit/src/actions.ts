@@ -39,6 +39,11 @@ export const ACTIONS = {
     chain: "tenant",
     sentBy: "gateway",
   },
+  "api_key.deleted": {
+    resourceType: "api_key",
+    chain: "tenant",
+    sentBy: "gateway",
+  },
   "proxy_connection.created": {
     resourceType: "proxy_connection",
     chain: "tenant",

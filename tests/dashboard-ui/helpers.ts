@@ -54,6 +54,8 @@ export const errorBanner = (page: Page) => page.locator(".banner[role=alert]");
 const NAV_MENUS: Record<string, string> = {
   "User pools": "User management",
   "User activity": "User management",
+  Connections: "Third-party services",
+  Webhooks: "Third-party services",
 };
 
 export async function openSection(page: Page, label: string): Promise<void> {

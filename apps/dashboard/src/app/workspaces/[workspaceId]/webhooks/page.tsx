@@ -29,7 +29,7 @@ const DELIVERY: Record<string, { tone: StatusTone; label: string }> = {
   delivered: { tone: "success", label: "Delivered" },
   pending: { tone: "warning", label: "Retrying" },
   failed: { tone: "danger", label: "Gave up" },
-  pull: { tone: "info", label: "Waiting for pull" },
+  pull: { tone: "info", label: "Pull mode" },
 };
 
 const EVENT_LABELS: Record<string, string> = {

@@ -150,6 +150,52 @@ describe("the dashboard API", () => {
     );
   });
 
+  it("an owner removes a revoked API key for good, and filters the audit log by several actions", async () => {
+    const owner = new Browser();
+    const ws = `/workspaces/${await owner.signUp(email("keys"))}`;
+    const created = await owner.call("POST", `${ws}/api-keys`, {
+      name: "old-server",
+    });
+    const { apiKey, key } = (await created.json()) as {
+      apiKey: { id: string };
+      key: string;
+    };
+    const whileActive = await owner.call(
+      "DELETE",
+      `${ws}/revoked-api-keys/${apiKey.id}`,
+    );
+    const revoked = await owner.call("DELETE", `${ws}/api-keys/${apiKey.id}`);
+    const removed = await owner.call(
+      "DELETE",
+      `${ws}/revoked-api-keys/${apiKey.id}`,
+    );
+    const list = await owner.call("GET", `${ws}/api-keys`);
+    const used = await fetch(`${GATEWAY_URL}/v1/secrets`, {
+      headers: { authorization: `Bearer ${key}` },
+    });
+
+    expect([whileActive.status, revoked.status, removed.status]).toEqual([
+      409, 204, 204,
+    ]);
+    expect(await list.text()).not.toContain(apiKey.id);
+    expect(used.status).toBe(401);
+
+    let events: { action: string; resourceId: string | null }[] = [];
+    for (let i = 0; i < 20 && events.length < 2; i++) {
+      const page = await owner.call(
+        "GET",
+        `${ws}/audit-events?action=api_key.revoked&action=api_key.deleted&outcome=success`,
+      );
+      expect(page.status).toBe(200);
+      events = ((await page.json()) as { events: typeof events }).events;
+      await sleep(250);
+    }
+    expect(events.map((e) => [e.action, e.resourceId])).toEqual([
+      ["api_key.deleted", apiKey.id],
+      ["api_key.revoked", apiKey.id],
+    ]);
+  });
+
   it("two users can't reach each other's workspaces", async () => {
     const a = new Browser();
     const b = new Browser();

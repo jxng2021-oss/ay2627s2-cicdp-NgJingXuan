@@ -1,6 +1,13 @@
 "use client";
 
-import { Fragment, useState, type FormEvent } from "react";
+import {
+  Fragment,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { Icon } from "@/components/icons";
 import {
   Button,
@@ -31,25 +38,113 @@ export interface LogPage {
   nextCursor: string | null;
 }
 
-export type LogQuery = Record<string, string | number | undefined>;
+export type LogQuery = Record<string, string | number | string[] | undefined>;
 
 const OUTCOMES = ["success", "denied", "failure"] as const;
 const PAGE_SIZE = 15;
 
 interface Filters {
-  action: string;
-  outcome: string;
-  resourceType: string;
+  action: string[];
+  outcome: string[];
+  resourceType: string[];
   from: string;
   to: string;
 }
 const NO_FILTERS: Filters = {
-  action: "",
-  outcome: "",
-  resourceType: "",
+  action: [],
+  outcome: [],
+  resourceType: [],
   from: "",
   to: "",
 };
+
+function MultiSelect({
+  label,
+  options,
+  chosen,
+  onChange,
+}: {
+  label: string;
+  options: readonly string[];
+  chosen: string[];
+  onChange: (chosen: string[]) => void;
+}) {
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: Event) => {
+      if (
+        event instanceof KeyboardEvent
+          ? event.key === "Escape"
+          : !box.current?.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [open]);
+  const summary =
+    chosen.length === 0
+      ? "Any"
+      : chosen.length === 1
+        ? chosen[0]
+        : `${chosen.length} chosen`;
+  const toggle = (option: string) =>
+    onChange(
+      chosen.includes(option)
+        ? chosen.filter((value) => value !== option)
+        : [...chosen, option],
+    );
+
+  return (
+    <div className="field multi-select" ref={box}>
+      <span className="multi-select-label" id={`${id}-label`}>
+        {label}
+      </span>
+      <button
+        type="button"
+        className="select multi-select-button"
+        aria-labelledby={`${id}-label ${id}-summary`}
+        aria-expanded={open}
+        aria-controls={`${id}-panel`}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span id={`${id}-summary`}>{summary}</span>
+        <Icon name="chevron-down" size={16} />
+      </button>
+      <div
+        id={`${id}-panel`}
+        className="multi-select-panel"
+        role="group"
+        aria-labelledby={`${id}-label`}
+        hidden={!open}
+      >
+        {options.map((option) => (
+          <label key={option} className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={chosen.includes(option)}
+              onChange={() => toggle(option)}
+            />
+            <span className="mono">{option}</span>
+          </label>
+        ))}
+        {chosen.length > 0 && (
+          <Button variant="ghost" onClick={() => onChange([])}>
+            Clear {label.toLowerCase()}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function iso(local: string): string | undefined {
   if (!local) return undefined;
@@ -88,9 +183,9 @@ export function AuditLog({
       load({
         limit: PAGE_SIZE,
         cursor,
-        action: filters.action || undefined,
-        outcome: filters.outcome || undefined,
-        resourceType: filters.resourceType || undefined,
+        action: filters.action,
+        outcome: filters.outcome,
+        resourceType: filters.resourceType,
         from: iso(filters.from),
         to: iso(filters.to),
       }),
@@ -114,24 +209,14 @@ export function AuditLog({
     title: string,
     options: readonly string[],
   ) => (
-    <div className="field">
-      <label htmlFor={`${id}-${key}`}>{title}</label>
-      <select
-        id={`${id}-${key}`}
-        className="select"
-        value={draft[key]}
-        onChange={(event) =>
-          setDraft((current) => ({ ...current, [key]: event.target.value }))
-        }
-      >
-        <option value="">Any</option>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    </div>
+    <MultiSelect
+      label={title}
+      options={options}
+      chosen={draft[key]}
+      onChange={(chosen) =>
+        setDraft((current) => ({ ...current, [key]: chosen }))
+      }
+    />
   );
 
   return (

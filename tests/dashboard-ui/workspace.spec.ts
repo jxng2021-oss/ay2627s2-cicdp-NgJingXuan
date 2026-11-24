@@ -1,6 +1,9 @@
+import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { email, expectNothingStored, openSection, signUp } from "./helpers";
+
+const GATEWAY_URL = process.env.GATEWAY_URL ?? "http://127.0.0.1:8080";
 
 test.describe.configure({ mode: "serial" });
 
@@ -51,6 +54,43 @@ test("create an API key: shown once with a warning and a copy button, then revok
   await expect(confirm).toContainText("This can't be undone.");
   await confirm.getByRole("button", { name: "Revoke key" }).click();
   await expect(row.getByText("Revoked")).toBeVisible();
+  await expect(row.getByRole("button", { name: "Revoke key" })).toHaveCount(0);
+
+  await row.getByRole("button", { name: "Remove" }).click();
+  const remove = page.getByRole("dialog", { name: "Remove revoked API key" });
+  await expect(remove).toContainText("The audit log keeps its history.");
+  await remove.getByRole("button", { name: "Keep it" }).click();
+  await expect(row).toBeVisible();
+  await row.getByRole("button", { name: "Remove" }).click();
+  await remove.getByRole("button", { name: "Remove key" }).click();
+  await expect(page.getByText("API key ci-deploy removed")).toBeVisible();
+  await expect(page.getByRole("row", { name: /ci-deploy/ })).toHaveCount(0);
+  await expect(page.getByText("No API keys yet.")).toBeVisible();
+});
+
+test("the sidebar groups third-party services, and every link has an icon", async () => {
+  const nav = page.getByRole("navigation", { name: "Workspace" });
+  for (const [menu, links] of [
+    ["Third-party services", ["Connections", "Webhooks"]],
+    ["User management", ["User pools", "User activity"]],
+  ] as const) {
+    const toggle = nav.getByRole("button", { name: menu });
+    if ((await toggle.getAttribute("aria-expanded")) !== "true")
+      await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    for (const label of links) {
+      const link = nav.getByRole("link", { name: label, exact: true });
+      await expect(link).toBeVisible();
+      await expect(link.locator(".nav-icon svg")).toHaveCount(1);
+    }
+  }
+  await expect(
+    nav.getByRole("link", { name: "Connections", exact: true }),
+  ).toHaveAttribute("href", `/workspaces/${workspace}/connections`);
+  await nav.getByRole("button", { name: "Third-party services" }).click();
+  await expect(
+    nav.getByRole("link", { name: "Webhooks", exact: true }),
+  ).toBeHidden();
 });
 
 test("secrets: create, never readable back, view versions, rotate and delete", async () => {
@@ -187,6 +227,47 @@ test("webhooks: create an endpoint with a Stripe secret, copy its address, delet
   ).toBeVisible();
   await expect(endpoint.getByText("No events yet.")).toBeVisible();
   await expect(page.getByText("whsec_uitest")).toHaveCount(0);
+
+  const stripeUrl =
+    (await endpoint
+      .locator("code", { hasText: "/v1/webhooks/" })
+      .textContent()) ?? "";
+  const event = JSON.stringify({
+    id: "evt_ui_pull",
+    type: "checkout.session.completed",
+    created: Math.floor(Date.now() / 1000),
+    data: {
+      object: {
+        id: "cs_test_ui",
+        payment_status: "paid",
+        amount_total: 1800,
+        currency: "sgd",
+        payment_intent: "pi_ui",
+        metadata: { order_id: "order-ui" },
+      },
+    },
+  });
+  const signedAt = Math.floor(Date.now() / 1000);
+  const signature = createHmac("sha256", "whsec_uitest0123456789abcdef")
+    .update(`${signedAt}.${event}`)
+    .digest("hex");
+  const delivered = await page.request.post(
+    `${GATEWAY_URL}/v1/webhooks/${stripeUrl.split("/v1/webhooks/")[1]}`,
+    {
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": `t=${signedAt},v1=${signature}`,
+      },
+      data: event,
+    },
+  );
+  expect(delivered.status()).toBe(200);
+  await page.reload();
+  const eventRow = endpoint.getByRole("row", { name: /Payment succeeded/ });
+  await expect(eventRow).toContainText("order-ui");
+  await expect(eventRow).toContainText("18.00 SGD");
+  await expect(eventRow.getByText("Pull mode")).toBeVisible();
+  await expect(page.getByText("Waiting for pull")).toHaveCount(0);
   await endpoint.getByRole("button", { name: "Copy Stripe address" }).click();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(
     /\/v1\/webhooks\/[0-9a-f-]{36}$/,
@@ -202,20 +283,38 @@ test("webhooks: create an endpoint with a Stripe secret, copy its address, delet
 
 test("the audit log shows the matching events, with request IDs, and filters", async () => {
   await openSection(page, "Audit log");
-  for (const action of [
+  await expect(page.getByRole("cell").first()).toBeVisible();
+  const recorded = [
     "user.signed_up",
     "api_key.created",
     "api_key.revoked",
+    "api_key.deleted",
     "secret.created",
     "secret.rotated",
     "secret.deleted",
     "file.uploaded",
     "file.deleted",
-  ]) {
+    "webhook_endpoint.created",
+    "webhook_endpoint.deleted",
+  ];
+  await page.getByRole("button", { name: "Action Any" }).click();
+  const actions = page.getByRole("group", { name: "Action" });
+  for (const action of recorded) await actions.getByLabel(action).check();
+  await page.keyboard.press("Escape");
+  await expect(actions).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: `Action ${recorded.length} chosen` }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  for (const action of recorded) {
     await expect(
       page.getByRole("cell", { name: action, exact: true }).first(),
     ).toBeVisible();
   }
+  await expect(
+    page.getByRole("cell", { name: "secret.read", exact: true }),
+  ).toHaveCount(0);
+
   await page
     .getByRole("row", { name: /secret.rotated/ })
     .getByRole("button", { name: "Details of secret.rotated" })
@@ -225,10 +324,21 @@ test("the audit log shows the matching events, with request IDs, and filters", a
   const requestId = await details.locator("code[title]").getAttribute("title");
   expect(requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-/);
 
-  await page.getByLabel("Action").selectOption("secret.rotated");
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(page.getByRole("button", { name: "Action Any" })).toBeVisible();
+  await page.getByRole("button", { name: "Action Any" }).click();
+  await actions.getByLabel("secret.rotated").check();
+  await actions.getByLabel("file.deleted").check();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Action 2 chosen" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Apply filters" }).click();
   await expect(
     page.getByRole("cell", { name: "secret.rotated", exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole("cell", { name: "file.deleted", exact: true }),
   ).toHaveCount(1);
   await expect(
     page.getByRole("cell", { name: "file.uploaded", exact: true }),
@@ -334,6 +444,47 @@ test("user pools: create one, see how to connect, and delete it (confirmed)", as
     .getByRole("button", { name: "Delete role" })
     .click();
   await expect(roles.getByText("No roles yet.")).toBeVisible();
+  const poolUrl = page.url();
+
+  await openSection(page, "User activity");
+  await page
+    .getByLabel("User pool", { exact: true })
+    .selectOption({ label: "Shop customers" });
+  for (const action of [
+    "pool_role.created",
+    "pool_role.updated",
+    "pool_role.deleted",
+  ]) {
+    await expect(
+      page.getByRole("cell", { name: action, exact: true }),
+    ).toHaveCount(1);
+  }
+  await page.getByRole("button", { name: "Action Any" }).click();
+  const actions = page.getByRole("group", { name: "Action" });
+  await actions.getByLabel("pool_role.created").check();
+  await actions.getByLabel("pool_role.deleted").check();
+  await page.getByRole("button", { name: "Outcome Any" }).click();
+  await expect(actions).toBeHidden();
+  await page
+    .getByRole("group", { name: "Outcome" })
+    .getByLabel("success")
+    .check();
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(
+    page.getByRole("cell", { name: "pool_role.created", exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole("cell", { name: "pool_role.deleted", exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole("cell", { name: "pool_role.updated", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(page.getByRole("button", { name: "Action Any" })).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "pool_role.updated", exact: true }),
+  ).toHaveCount(1);
+  await page.goto(poolUrl);
 
   await page.getByRole("button", { name: "Delete user pool" }).click();
   const confirm = page.getByRole("dialog", { name: "Delete user pool" });

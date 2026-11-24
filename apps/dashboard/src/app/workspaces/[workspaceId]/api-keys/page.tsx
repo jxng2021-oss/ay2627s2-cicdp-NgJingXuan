@@ -35,6 +35,7 @@ export default function ApiKeysPage() {
   const [newKey, setNewKey] = useState<string>();
   const [copied, setCopied] = useState(false);
   const [revoking, setRevoking] = useState<Key>();
+  const [removing, setRemoving] = useState<Key>();
 
   async function create(event: FormEvent) {
     event.preventDefault();
@@ -67,6 +68,22 @@ export default function ApiKeysPage() {
       await api.revokeApiKey(id, revoking.id);
       toast(`API key ${revoking.name} revoked`);
       setRevoking(undefined);
+      keys.reload();
+    } catch (error) {
+      setFailure(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (!removing) return;
+    setBusy(true);
+    setFailure(undefined);
+    try {
+      await api.removeRevokedApiKey(id, removing.id);
+      toast(`API key ${removing.name} removed`);
+      setRemoving(undefined);
       keys.reload();
     } catch (error) {
       setFailure(error);
@@ -123,7 +140,7 @@ export default function ApiKeysPage() {
 
       {!isOwner && (
         <Banner title="Viewing as a member">
-          Only workspace owners can create or revoke API keys.
+          Only workspace owners can create, revoke or remove API keys.
         </Banner>
       )}
 
@@ -174,12 +191,19 @@ export default function ApiKeysPage() {
                     <td data-label="Last used">{formatDate(key.lastUsedAt)}</td>
                     {isOwner && (
                       <td className="actions">
-                        {key.status === "active" && (
+                        {key.status === "active" ? (
                           <Button
                             variant="danger"
                             onClick={() => setRevoking(key)}
                           >
                             Revoke key
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            onClick={() => setRemoving(key)}
+                          >
+                            Remove
                           </Button>
                         )}
                       </td>
@@ -238,6 +262,25 @@ export default function ApiKeysPage() {
         <p>
           Apps using <strong>{revoking?.name}</strong> will get 401 from now on.
           This can&apos;t be undone.
+        </p>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={removing !== undefined}
+        title="Remove revoked API key"
+        confirmLabel="Remove key"
+        busyLabel="Removing..."
+        busy={busy}
+        error={failure}
+        onConfirm={() => void remove()}
+        onCancel={() => {
+          setRemoving(undefined);
+          setFailure(undefined);
+        }}
+      >
+        <p>
+          <strong>{removing?.name}</strong> disappears from this list for good.
+          The audit log keeps its history.
         </p>
       </ConfirmDialog>
     </>

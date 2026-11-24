@@ -41,8 +41,12 @@ test("an owner sets a policy, a refused call shows in the audit log, and the pol
 
   await page.waitForURL("**/connections/payments");
   const details = page.getByRole("region", { name: "Details" });
-  await expect(details).toContainText("Only POST /charges");
-  await expect(details).toContainText("amount ≤ 500 per call, 800 per day");
+  await expect(details).not.toContainText("Only POST /charges");
+  const policy = page.getByRole("region", { name: "Edit policy" });
+  await expect(policy.getByLabel("Allowed routes")).toHaveValue(
+    "POST /charges",
+  );
+  await expect(policy.getByLabel("Max per day")).toHaveValue("800");
   const connectionUrl = page.url();
 
   const refused = await request.post(
@@ -75,9 +79,10 @@ test("an owner sets a policy, a refused call shows in the audit log, and the pol
 
   await page.goto(connectionUrl);
   const usage = page.getByRole("region", { name: "Usage" });
-  await expect(usage).toContainText("0 of 800 amount");
+  await expect(usage).toContainText("0 of 800");
+  await expect(usage).toContainText("The total of amount in every call");
   await expect(
-    usage.getByRole("meter", { name: "Amount today" }),
+    usage.getByRole("meter", { name: "Amount requested today" }),
   ).toBeVisible();
 
   const edit = page.getByRole("region", { name: "Edit policy" });
@@ -85,7 +90,10 @@ test("an owner sets a policy, a refused call shows in the audit log, and the pol
   await edit.getByLabel("Max per call").fill("1000");
   await edit.getByLabel("Max per day").fill("5000");
   await edit.getByRole("button", { name: "Save policy" }).click();
-  await expect(details).toContainText("amount ≤ 1,000 per call, 5,000 per day");
+  await expect(page.getByText("Policy of payments saved")).toBeVisible();
+  await page.reload();
+  await expect(edit.getByLabel("Max per call")).toHaveValue("1000");
+  await expect(edit.getByLabel("Max per day")).toHaveValue("5000");
 });
 
 test("an owner deletes a workspace after typing its name; it is gone for good", async ({

@@ -115,6 +115,8 @@ export const workspace = {
     }),
   revokeApiKey: (id: string, keyId: string) =>
     request<void>("DELETE", ws(id, `/api-keys/${name(keyId)}`)),
+  removeRevokedApiKey: (id: string, keyId: string) =>
+    request<void>("DELETE", ws(id, `/revoked-api-keys/${name(keyId)}`)),
 
   secrets: (id: string, cursor?: string) =>
     request<SecretList>("GET", ws(id, "/secrets"), {
@@ -315,7 +317,7 @@ export const workspace = {
   poolAuditEvents: (
     id: string,
     poolId: string,
-    query: Record<string, string | number | undefined>,
+    query: Record<string, string | number | string[] | undefined>,
   ) =>
     request<PoolAuditList>(
       "GET",
@@ -363,6 +365,6 @@ export const workspace = {
 
   auditEvents: (
     id: string,
-    query: Record<string, string | number | undefined>,
+    query: Record<string, string | number | string[] | undefined>,
   ) => request<AuditList>("GET", ws(id, "/audit-events"), { query }),
 };

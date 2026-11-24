@@ -159,6 +159,11 @@ export const workspaceRoutes: FastifyPluginCallback<DashboardOptions> = (
       { schema: schemas.revokeKeySchema, config: owner },
       keys.revoke,
     );
+    api.delete(
+      "/revoked-api-keys/:keyId",
+      { schema: schemas.removeRevokedKeySchema, config: owner },
+      keys.remove,
+    );
 
     api.get(
       "/secrets",

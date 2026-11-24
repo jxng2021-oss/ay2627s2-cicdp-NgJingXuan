@@ -20,6 +20,7 @@ const ACTIONS = [
   "user.deleted",
   "api_key.created",
   "api_key.revoked",
+  "api_key.deleted",
   "secret.created",
   "secret.read",
   "secret.rotated",
@@ -42,6 +43,9 @@ const ACTIONS = [
   "feature_flag.updated",
   "feature_flag.toggled",
   "feature_flag.deleted",
+  "webhook_endpoint.created",
+  "webhook_endpoint.updated",
+  "webhook_endpoint.deleted",
 ] as const satisfies readonly AuditEvent["action"][];
 const RESOURCES = [
   "user",
@@ -53,6 +57,7 @@ const RESOURCES = [
   "tenant",
   "user_pool",
   "feature_flag",
+  "webhook_endpoint",
 ] as const satisfies readonly AuditEvent["resourceType"][];
 
 export default function AuditPage() {

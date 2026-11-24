@@ -35,6 +35,7 @@ const CHANGES = new Set([
   "secret.deleted",
   "api_key.created",
   "api_key.revoked",
+  "api_key.deleted",
   "proxy_connection.created",
   "proxy_connection.updated",
   "proxy_connection.deleted",

@@ -1,4 +1,4 @@
-import { Type } from "typebox";
+import { Type, type TSchema } from "typebox";
 import {
   commonErrors,
   errorResponse,
@@ -11,6 +11,7 @@ export const TENANT_AUDIT_ACTIONS = [
   "tenant.suspended",
   "api_key.created",
   "api_key.revoked",
+  "api_key.deleted",
   "proxy_connection.created",
   "proxy_connection.updated",
   "proxy_connection.deleted",
@@ -181,13 +182,37 @@ export const POOL_AUDIT_ACTIONS = [
 ] as const;
 const POOL_RESOURCE_TYPES = ["pool_user", "pool_role"] as const;
 
+const anyOf = (item: TSchema, max: number) =>
+  Type.Optional(
+    Type.Array(item, {
+      minItems: 1,
+      maxItems: max,
+      description: "Repeat to match any of several values",
+    }),
+  );
+
+export const DashboardAuditEventsQuery = Type.Object(
+  {
+    ...AuditEventsQuery.properties,
+    action: anyOf(Action, TENANT_AUDIT_ACTIONS.length),
+    outcome: anyOf(Outcome, OUTCOMES.length),
+    resourceType: anyOf(ResourceType, TENANT_RESOURCE_TYPES.length),
+  },
+  { additionalProperties: false },
+);
+
 export const PoolAuditEventsQuery = Type.Object(
   {
     ...AuditEventsQuery.properties,
-    action: Type.Optional(
+    action: anyOf(
       Type.Enum([...POOL_AUDIT_ACTIONS], { description: "What happened" }),
+      POOL_AUDIT_ACTIONS.length,
     ),
-    resourceType: Type.Optional(Type.Enum([...POOL_RESOURCE_TYPES])),
+    outcome: anyOf(Outcome, OUTCOMES.length),
+    resourceType: anyOf(
+      Type.Enum([...POOL_RESOURCE_TYPES]),
+      POOL_RESOURCE_TYPES.length,
+    ),
   },
   { additionalProperties: false },
 );

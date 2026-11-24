@@ -8,6 +8,7 @@ import {
 import { Type, type TObject, type TProperties } from "typebox";
 import {
   listAuditEventsSchema,
+  DashboardAuditEventsQuery,
   PoolAuditEventsQuery,
   PoolAuditPage,
 } from "./audit-schemas.js";
@@ -804,6 +805,29 @@ export const revokeKeySchema = {
   },
 };
 
+export const removeRevokedKeySchema = {
+  operationId: "removeRevokedApiKey",
+  tags: ["API keys"],
+  summary: "Remove a revoked API key from the list for good (owners only)",
+  security,
+  params: KeyParams,
+  response: {
+    204: noContent("Removed"),
+    ...authErrors,
+    401: notSignedIn,
+    403: ownersOnly,
+    404: error(
+      "NOT_FOUND: no such workspace or key.",
+      "NOT_FOUND",
+      "API key not found",
+    ),
+    409: conflict(
+      "the key is still active; revoke it first.",
+      "Revoke the API key before removing it",
+    ),
+  },
+};
+
 export const listSecretsDashboardSchema = fromPublic(listSecretsSchema, {
   operationId: "listSecrets",
   tag: "Secrets",
@@ -897,11 +921,14 @@ export const deleteConnectionDashboardSchema = fromPublic(
   },
 );
 
-export const listAuditDashboardSchema = fromPublic(listAuditEventsSchema, {
-  operationId: "listAuditEvents",
-  tag: "Audit",
-  summary: "This workspace's audit events",
-});
+export const listAuditDashboardSchema = {
+  ...fromPublic(listAuditEventsSchema, {
+    operationId: "listAuditEvents",
+    tag: "Audit",
+    summary: "This workspace's audit events",
+  }),
+  querystring: DashboardAuditEventsQuery,
+};
 
 const PoolSettings = {
   accessTokenTtlSeconds: Type.Integer({
