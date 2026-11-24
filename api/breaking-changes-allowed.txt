@@ -66,3 +66,12 @@ GET /v1/audit-events added the new `webhook_endpoint` enum value to the `events/
 GET /v1/audit-events added the new `webhook_endpoint.created` enum value to the `events/items/action` response property for the response status `200`
 GET /v1/audit-events added the new `webhook_endpoint.deleted` enum value to the `events/items/action` response property for the response status `200`
 GET /v1/audit-events added the new `webhook_endpoint.updated` enum value to the `events/items/action` response property for the response status `200`
+
+# 2026-11-24, removing revoked API keys from the dashboard, to be approved in
+# the PR review by the project owner.
+# WHY: an owner can now remove a revoked API key from the dashboard's list,
+# and that is audited, so the audit log's action list gains api_key.deleted.
+# Only a new value is added to a list that already grows with every feature;
+# existing values and the response shape are unchanged, and clients reading
+# the log should ignore values they don't know.
+GET /v1/audit-events added the new `api_key.deleted` enum value to the `events/items/action` response property for the response status `200`

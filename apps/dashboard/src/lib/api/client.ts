@@ -50,7 +50,7 @@ type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export interface RequestOptions {
   json?: unknown;
-  query?: Record<string, string | number | undefined>;
+  query?: Record<string, string | number | string[] | undefined>;
   signal?: AbortSignal;
 }
 
@@ -108,7 +108,9 @@ export async function request<T>(
 ): Promise<T> {
   const search = new URLSearchParams();
   for (const [name, value] of Object.entries(options.query ?? {})) {
-    if (value !== undefined && value !== "") search.set(name, String(value));
+    for (const item of Array.isArray(value) ? value : [value]) {
+      if (item !== undefined && item !== "") search.append(name, String(item));
+    }
   }
   const url = search.size > 0 ? `${path}?${search.toString()}` : path;
   const headers: Record<string, string> =

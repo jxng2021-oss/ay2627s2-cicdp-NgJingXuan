@@ -5,6 +5,7 @@ import {
   listTenantApiKeys,
   createApiKey,
   revokeTenantApiKey,
+  deleteRevokedTenantApiKey,
   type KeyAudit,
 } from "../../services/api-key.service.js";
 import type { DashboardOptions } from "../../routes/dashboard/index.js";
@@ -59,6 +60,28 @@ export function apiKeysController(options: DashboardOptions) {
         ))
       ) {
         return sendError(reply, 404, "NOT_FOUND", "API key not found");
+      }
+      return reply.code(204).send();
+    },
+
+    remove: async (request: FastifyRequest, reply: FastifyReply) => {
+      const { keyId } = request.params as { keyId: string };
+      const result = await deleteRevokedTenantApiKey(
+        db,
+        request.tenantId,
+        keyId,
+        asUser(request),
+      );
+      if (result === "missing") {
+        return sendError(reply, 404, "NOT_FOUND", "API key not found");
+      }
+      if (result === "active") {
+        return sendError(
+          reply,
+          409,
+          "CONFLICT",
+          "Revoke the API key before removing it",
+        );
       }
       return reply.code(204).send();
     },

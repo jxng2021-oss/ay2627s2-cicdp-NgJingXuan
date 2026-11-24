@@ -69,6 +69,7 @@ const ROUTES: [
   ["GET", "/api-keys"],
   ["POST", "/api-keys", { name: "k" }],
   ["DELETE", `/api-keys/${KEY_ID}`],
+  ["DELETE", `/revoked-api-keys/${KEY_ID}`],
   ["GET", "/secrets"],
   ["PUT", "/secrets/db-password", { value: "v" }],
   ["POST", "/secrets/db-password/rotate", { value: "v" }],
@@ -98,6 +99,7 @@ const ROUTES: [
 const OWNER_ONLY = new Set([
   "POST /api-keys",
   `DELETE /api-keys/${KEY_ID}`,
+  `DELETE /revoked-api-keys/${KEY_ID}`,
   "PUT /secrets/db-password",
   "POST /secrets/db-password/rotate",
   "DELETE /secrets/db-password",
@@ -259,6 +261,49 @@ describe("owner routes", () => {
     expect(used.statusCode).toBe(401);
   });
 
+  it("API keys: only a revoked key can be removed; it leaves the list and the removal is recorded", async () => {
+    const created = await owner.request(
+      "POST",
+      owner.ws(workspace, "/api-keys"),
+      { body: { name: "old" } },
+    );
+    const { apiKey } = created.json<{ apiKey: { id: string } }>();
+    const removeActive = await owner.request(
+      "DELETE",
+      owner.ws(workspace, `/revoked-api-keys/${apiKey.id}`),
+    );
+    await owner.request(
+      "DELETE",
+      owner.ws(workspace, `/api-keys/${apiKey.id}`),
+    );
+    const removed = await owner.request(
+      "DELETE",
+      owner.ws(workspace, `/revoked-api-keys/${apiKey.id}`),
+    );
+    const again = await owner.request(
+      "DELETE",
+      owner.ws(workspace, `/revoked-api-keys/${apiKey.id}`),
+    );
+    const list = await owner.request("GET", owner.ws(workspace, "/api-keys"));
+
+    expect(removeActive.statusCode).toBe(409);
+    expect(removeActive.json()).toMatchObject({ error: { code: "CONFLICT" } });
+    expect(removed.statusCode).toBe(204);
+    expect(again.statusCode).toBe(404);
+    expect(
+      list.json<{ apiKeys: { id: string }[] }>().apiKeys.map((k) => k.id),
+    ).not.toContain(apiKey.id);
+    expect(
+      audit.events
+        .filter((e) => e.resourceId === apiKey.id)
+        .map((e) => [e.action, e.actorType, e.tenantId]),
+    ).toEqual([
+      ["api_key.created", "user", workspace],
+      ["api_key.revoked", "user", workspace],
+      ["api_key.deleted", "user", workspace],
+    ]);
+  });
+
   it("secrets: write-only, so no route returns a value (no reveal, metadata only)", async () => {
     await owner.request("PUT", owner.ws(workspace, "/secrets/db-password"), {
       body: { value: "the-value-123" },
@@ -331,6 +376,17 @@ describe("owner routes", () => {
     expectError(created, 400, "BAD_REQUEST");
     expect(events.statusCode).toBe(200);
     expect(auditService.requests[0]?.headers["x-tenant-id"]).toBe(workspace);
+    const several = await owner.request(
+      "GET",
+      owner.ws(
+        workspace,
+        "/audit-events?action=secret.read&action=api_key.deleted&outcome=success&outcome=denied",
+      ),
+    );
+    expect(several.statusCode).toBe(200);
+    expect(auditService.requests.at(-1)?.url).toBe(
+      "/events?action=secret.read&action=api_key.deleted&outcome=success&outcome=denied&limit=50",
+    );
     expect(auditService.problems).toEqual([]);
   });
 });

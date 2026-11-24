@@ -76,6 +76,9 @@ function NavEntry({
                   isCurrent(pathname, href, false) ? "page" : undefined
                 }
               >
+                <span className="nav-icon" aria-hidden="true">
+                  <Icon name={child.icon} size={18} weight="light" />
+                </span>
                 {child.label}
               </Link>
             </li>

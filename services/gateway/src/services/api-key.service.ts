@@ -3,6 +3,7 @@ import type { AuditClient, AuditEvent } from "../audit.js";
 import { generateApiKey } from "./api-key-tokens.service.js";
 import type { Database } from "../db/client.js";
 import {
+  deleteRevokedApiKey,
   insertApiKey,
   listApiKeys,
   revokeApiKey,
@@ -75,6 +76,24 @@ export function revokeTenantApiKey(
       );
     }
     return revoked;
+  });
+}
+
+export function deleteRevokedTenantApiKey(
+  db: Database,
+  tenantId: string,
+  keyId: string,
+  { audit, log, actor }: KeyAudit,
+): Promise<"deleted" | "active" | "missing"> {
+  return db.transaction(async (tx) => {
+    const result = await deleteRevokedApiKey(tx, tenantId, keyId);
+    if (result === "deleted") {
+      await audit.record(
+        { ...actor, action: "api_key.deleted", tenantId, resourceId: keyId },
+        log,
+      );
+    }
+    return result;
   });
 }
 

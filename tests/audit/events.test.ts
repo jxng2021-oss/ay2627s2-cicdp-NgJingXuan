@@ -229,6 +229,14 @@ describe("GET /events (for the gateway)", () => {
       "secret.read:a",
     ]);
     expect(await ids("?outcome=failure")).toHaveLength(1);
+    expect(
+      await ids("?action=secret.read&action=secret.deleted&outcome=success"),
+    ).toEqual([
+      "secret.deleted:a",
+      "secret.read:c",
+      "secret.read:b",
+      "secret.read:a",
+    ]);
     expect(await ids("?resourceType=secret&resourceId=a")).toEqual([
       "secret.deleted:a",
       "secret.read:a",

@@ -35,9 +35,24 @@ export const EventsQuery = Type.Object(
   {
     from: Type.Optional(Type.String({ pattern: TIMESTAMP })),
     to: Type.Optional(Type.String({ pattern: TIMESTAMP })),
-    action: Type.Optional(literals(ACTION_NAMES)),
-    outcome: Type.Optional(literals(OUTCOMES)),
-    resourceType: Type.Optional(literals(RESOURCE_TYPES)),
+    action: Type.Optional(
+      Type.Array(literals(ACTION_NAMES), {
+        minItems: 1,
+        maxItems: ACTION_NAMES.length,
+      }),
+    ),
+    outcome: Type.Optional(
+      Type.Array(literals(OUTCOMES), {
+        minItems: 1,
+        maxItems: OUTCOMES.length,
+      }),
+    ),
+    resourceType: Type.Optional(
+      Type.Array(literals(RESOURCE_TYPES), {
+        minItems: 1,
+        maxItems: RESOURCE_TYPES.length,
+      }),
+    ),
     resourceId: Type.Optional(Type.String({ pattern: RESOURCE_ID })),
     limit: Type.Optional(
       Type.Integer({ minimum: 1, maximum: 100, default: 50 }),

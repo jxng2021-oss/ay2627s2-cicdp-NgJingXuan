@@ -58,9 +58,9 @@ export interface EventFilters {
   tenantId?: string;
   from?: Date;
   to?: Date;
-  action?: string;
-  outcome?: string;
-  resourceType?: string;
+  action?: string[];
+  outcome?: string[];
+  resourceType?: string[];
   resourceId?: string;
   beforeSeq?: number;
 }
@@ -76,11 +76,14 @@ export function listEvents(
     conditions.push(eq(auditEvents.tenantId, filters.tenantId));
   if (filters.from) conditions.push(gte(auditEvents.occurredAt, filters.from));
   if (filters.to) conditions.push(lt(auditEvents.occurredAt, filters.to));
-  if (filters.action) conditions.push(eq(auditEvents.action, filters.action));
-  if (filters.outcome)
-    conditions.push(eq(auditEvents.outcome, filters.outcome));
-  if (filters.resourceType) {
-    conditions.push(eq(auditEvents.resourceType, filters.resourceType));
+  if (filters.action?.length) {
+    conditions.push(inArray(auditEvents.action, filters.action));
+  }
+  if (filters.outcome?.length) {
+    conditions.push(inArray(auditEvents.outcome, filters.outcome));
+  }
+  if (filters.resourceType?.length) {
+    conditions.push(inArray(auditEvents.resourceType, filters.resourceType));
   }
   if (filters.resourceId) {
     conditions.push(eq(auditEvents.resourceId, filters.resourceId));

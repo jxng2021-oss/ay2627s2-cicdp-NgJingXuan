@@ -247,6 +247,24 @@ describe("user pools", () => {
       ]),
     );
 
+    const chosen = async (query: string) => {
+      const response = await owner.call(
+        "GET",
+        `/workspaces/${workspace}/user-pools/${pool}/audit-events?limit=100&action=pool_user.login_failed&action=pool_user.unlocked${query}`,
+      );
+      expect(response.status).toBe(200);
+      const { events } = (await response.json()) as {
+        events: { action: string; outcome: string }[];
+      };
+      return new Set(events.map((e) => `${e.action} ${e.outcome}`));
+    };
+    expect(await chosen("&outcome=success&outcome=denied")).toEqual(
+      new Set(["pool_user.login_failed denied", "pool_user.unlocked success"]),
+    );
+    expect(await chosen("&outcome=success")).toEqual(
+      new Set(["pool_user.unlocked success"]),
+    );
+
     const workspaceLog = await app("GET", "/audit-events?limit=100");
     expect(workspaceLog.status).toBe(200);
     const workspaceActions = (

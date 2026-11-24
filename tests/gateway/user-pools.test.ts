@@ -255,6 +255,29 @@ describe("user pools in the dashboard", () => {
     );
     expect(sent.headers["x-tenant-id"]).toBe(workspace);
 
+    const several = await member.request(
+      "GET",
+      member.ws(
+        workspace,
+        `/user-pools/${pool}/audit-events?action=pool_user.login_failed&action=pool_role.created&outcome=success&limit=50`,
+      ),
+    );
+    expect(several.statusCode).toBe(200);
+    expect(auditService.requests.at(-1)!.url).toBe(
+      `/pools/${pool}/events?action=pool_user.login_failed&action=pool_role.created&outcome=success&limit=50`,
+    );
+    expectError(
+      await member.request(
+        "GET",
+        member.ws(
+          workspace,
+          `/user-pools/${pool}/audit-events?action=pool_user.login_failed&action=secret.read`,
+        ),
+      ),
+      400,
+      "BAD_REQUEST",
+    );
+
     const stranger = new Browser(app);
     const theirs = await stranger.signUp("stranger@example.com", "Theirs");
     expectError(

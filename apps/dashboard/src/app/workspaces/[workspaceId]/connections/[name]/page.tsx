@@ -110,14 +110,18 @@ export default function ConnectionPage() {
                 </>
               )}
             </dd>
-            <dt>Policy</dt>
-            <dd>
-              <span className="policy-summary">
-                {describePolicy(connection.policy).map((line) => (
-                  <span key={line}>{line}</span>
-                ))}
-              </span>
-            </dd>
+            {!isOwner && (
+              <>
+                <dt>Policy</dt>
+                <dd>
+                  <span className="policy-summary">
+                    {describePolicy(connection.policy).map((line) => (
+                      <span key={line}>{line}</span>
+                    ))}
+                  </span>
+                </dd>
+              </>
+            )}
             <dt>Updated</dt>
             <dd>{formatDate(connection.updatedAt)}</dd>
           </dl>
@@ -214,8 +218,11 @@ function Usage({ connection }: { connection: Connection }) {
                 <p className="sec-label">Calls this window</p>
                 <p className="mono">
                   {n(usage.data.calls.used)} of {n(usage.data.calls.limit)} (per{" "}
-                  {usage.data.calls.windowSeconds}s, resets in{" "}
-                  {usage.data.calls.resetSeconds}s)
+                  {usage.data.calls.windowSeconds}s
+                  {usage.data.calls.used > 0 &&
+                    usage.data.calls.resetSeconds > 0 &&
+                    `, resets in ${usage.data.calls.resetSeconds}s`}
+                  )
                 </p>
                 <div
                   className="progress"
@@ -239,15 +246,21 @@ function Usage({ connection }: { connection: Connection }) {
             )}
             {usage.data.amount && (
               <div className="stack-2">
-                <p className="sec-label">Amount Today ({usage.data.day} UTC)</p>
+                <p className="sec-label">
+                  Amount requested today ({usage.data.day} UTC)
+                </p>
                 <p className="mono">
                   {n(usage.data.amount.usedToday)} of{" "}
-                  {n(usage.data.amount.maxPerDay)} {usage.data.amount.field}
+                  {n(usage.data.amount.maxPerDay)}
+                </p>
+                <p className="hint">
+                  The total of <code>{usage.data.amount.field}</code> in every
+                  call the outside API accepted, whether or not it was paid.
                 </p>
                 <div
                   className="progress"
                   role="meter"
-                  aria-label="Amount today"
+                  aria-label="Amount requested today"
                   aria-valuemin={0}
                   aria-valuemax={usage.data.amount.maxPerDay}
                   aria-valuenow={usage.data.amount.usedToday}

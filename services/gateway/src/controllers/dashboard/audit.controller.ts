@@ -6,9 +6,11 @@ import { poolPath } from "../../services/user-pools.service.js";
 function queryString(request: FastifyRequest): string {
   const search = new URLSearchParams();
   for (const [name, value] of Object.entries(
-    request.query as Record<string, string | number | undefined>,
+    request.query as Record<string, string | number | string[] | undefined>,
   )) {
-    if (value !== undefined) search.set(name, String(value));
+    for (const item of Array.isArray(value) ? value : [value]) {
+      if (item !== undefined) search.append(name, String(item));
+    }
   }
   return search.size > 0 ? `?${search.toString()}` : "";
 }

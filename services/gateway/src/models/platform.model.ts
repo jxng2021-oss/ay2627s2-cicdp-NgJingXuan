@@ -56,6 +56,29 @@ export function listApiKeys(db: Database, tenantId: string): Promise<ApiKey[]> {
     .orderBy(apiKeys.createdAt);
 }
 
+export async function deleteRevokedApiKey(
+  db: Database,
+  tenantId: string,
+  keyId: string,
+): Promise<"deleted" | "active" | "missing"> {
+  const deleted = await db
+    .delete(apiKeys)
+    .where(
+      and(
+        eq(apiKeys.id, keyId),
+        eq(apiKeys.tenantId, tenantId),
+        eq(apiKeys.status, "revoked"),
+      ),
+    )
+    .returning({ id: apiKeys.id });
+  if (deleted.length > 0) return "deleted";
+  const found = await db
+    .select({ id: apiKeys.id })
+    .from(apiKeys)
+    .where(and(eq(apiKeys.id, keyId), eq(apiKeys.tenantId, tenantId)));
+  return found.length > 0 ? "active" : "missing";
+}
+
 export async function revokeApiKey(
   db: Database,
   tenantId: string,
