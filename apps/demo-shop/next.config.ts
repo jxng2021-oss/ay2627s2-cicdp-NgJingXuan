@@ -5,6 +5,7 @@ const config: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
   poweredByHeader: false,
+  serverExternalPackages: ["pg"],
   reactStrictMode: true,
   headers() {
     return Promise.resolve([

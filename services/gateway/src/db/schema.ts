@@ -1,5 +1,7 @@
 import {
+  bigserial,
   index,
+  integer,
   jsonb,
   pgEnum,
   primaryKey,
@@ -10,6 +12,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import type { ConnectionPolicy } from "../services/policy.service.js";
+import type { CleanEventData } from "../services/stripe-webhook.service.js";
 
 export const tenantStatus = pgEnum("tenant_status", [
   "active",
@@ -156,9 +159,64 @@ export const oauthIdentities = pgTable(
   ],
 );
 
+export const webhookEndpoints = pgTable(
+  "webhook_endpoints",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    provider: text("provider").notNull(),
+    signingSecretName: text("signing_secret_name").notNull(),
+    forwardUrl: text("forward_url"),
+    ...timestamps,
+  },
+  (table) => [
+    unique("webhook_endpoints_tenant_name").on(table.tenantId, table.name),
+  ],
+);
+
+export const webhookEvents = pgTable(
+  "webhook_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    seq: bigserial("seq", { mode: "number" }).notNull(),
+    endpointId: uuid("endpoint_id")
+      .notNull()
+      .references(() => webhookEndpoints.id, { onDelete: "cascade" }),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    providerEventId: text("provider_event_id").notNull(),
+    data: jsonb("data").$type<CleanEventData>().notNull(),
+    deliveryStatus: text("delivery_status").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    receivedAt: timestamp("received_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+  },
+  (table) => [
+    unique("webhook_events_endpoint_provider_event").on(
+      table.endpointId,
+      table.providerEventId,
+    ),
+    index("webhook_events_tenant_seq_idx").on(table.tenantId, table.seq),
+    index("webhook_events_due_idx").on(
+      table.deliveryStatus,
+      table.nextAttemptAt,
+    ),
+  ],
+);
+
 export type Tenant = typeof tenants.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Membership = typeof memberships.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type ProxyConnection = typeof proxyConnections.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
+export type WebhookEndpoint = typeof webhookEndpoints.$inferSelect;
+export type WebhookEvent = typeof webhookEvents.$inferSelect;

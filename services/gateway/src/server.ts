@@ -21,6 +21,7 @@ const app = buildApp({
   db: database.db,
   rateLimitStore: new RedisRateLimitStore(redis),
   audit,
+  webhookDeliveryIntervalMs: 10_000,
   logger: {
     redact: {
       paths: [

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { charge } from "@/lib/payments";
+import { checkoutResult, startCheckout } from "@/lib/payments";
 import { listFiles, listSecrets, PlatformError } from "@/lib/platform/client";
 import { describeError } from "@/lib/messages";
 
@@ -82,37 +82,142 @@ describe("platform client", () => {
   });
 });
 
-describe("payments through the connection", () => {
-  it("a 201 from the provider is a charge", async () => {
+const ORDER = "6f1c2a3b-0000-4000-8000-000000000001";
+const SHOPPER = {
+  id: "7a1c2a3b-0000-4000-8000-000000000002",
+  email: "ada@example.com",
+};
+const order = (totalCents: number) => ({
+  orderId: ORDER,
+  slug: "field-notebook",
+  name: "Field Notebook",
+  quantity: 2,
+  totalCents,
+  shopper: SHOPPER,
+});
+const SESSION = "cs_test_a1B2c3D4e5F6g7H8";
+
+describe("Stripe Checkout through the connection", () => {
+  it("creates a Checkout Session with form data, the order as idempotency key, and returns Stripe's page", async () => {
+    vi.stubEnv("SHOP_URL", "http://localhost:3100");
     const fetch = vi.fn(() =>
-      Promise.resolve(reply(201, { id: "ch_1", status: "succeeded" })),
+      Promise.resolve(
+        reply(200, {
+          id: SESSION,
+          url: "https://checkout.stripe.com/c/pay/cs_test_x",
+        }),
+      ),
     );
     vi.stubGlobal("fetch", fetch);
-    expect(await charge(1800, "1 x Field Notebook")).toEqual({
+    expect(await startCheckout(order(3600))).toEqual({
       ok: true,
-      chargeId: "ch_1",
+      url: "https://checkout.stripe.com/c/pay/cs_test_x",
+      sessionId: SESSION,
     });
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("http://gateway:8080/v1/proxy/payments/charges");
-    expect(JSON.parse(init.body as string)).toEqual({
-      amount: 1800,
-      currency: "sgd",
-      description: "1 x Field Notebook",
+    expect(url).toBe("http://gateway:8080/v1/proxy/stripe/checkout/sessions");
+    const headers = init.headers as Record<string, string>;
+    expect(headers["content-type"]).toBe("application/x-www-form-urlencoded");
+    expect(headers["idempotency-key"]).toBe(ORDER);
+    expect(
+      Object.fromEntries(new URLSearchParams(init.body as string)),
+    ).toEqual({
+      mode: "payment",
+      "payment_method_types[0]": "card",
+      "line_items[0][quantity]": "1",
+      "line_items[0][price_data][currency]": "sgd",
+      "line_items[0][price_data][unit_amount]": "3600",
+      "line_items[0][price_data][product_data][name]": "2 x Field Notebook",
+      success_url:
+        "http://localhost:3100/orders/complete?session_id={CHECKOUT_SESSION_ID}",
+      cancel_url:
+        "http://localhost:3100/products/field-notebook?payment=cancelled",
+      client_reference_id: ORDER,
+      customer_email: "ada@example.com",
+      "metadata[order_id]": ORDER,
+      "metadata[shopper_id]": SHOPPER.id,
+      "metadata[slug]": "field-notebook",
+      "metadata[quantity]": "2",
+      "payment_intent_data[metadata][order_id]": ORDER,
     });
   });
 
-  it("the provider's own errors are results, not platform errors", async () => {
+  it("refuses a payment page that isn't Stripe's, and reports Stripe's errors", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
-        Promise.resolve(reply(402, { error: { type: "card_declined" } })),
+        Promise.resolve(reply(200, { url: "https://evil.example/pay" })),
       ),
     );
-    expect(await charge(200_000, "x")).toEqual({
+    expect(await startCheckout(order(3600))).toEqual({
       ok: false,
-      reason: "declined",
-      status: 402,
+      status: 200,
     });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(reply(400, { error: { type: "invalid" } }))),
+    );
+    expect(await startCheckout(order(3600))).toEqual({
+      ok: false,
+      status: 400,
+    });
+  });
+
+  it("a paid session is read back from Stripe, never from the return link", async () => {
+    const fetch = vi.fn(() =>
+      Promise.resolve(
+        reply(200, {
+          id: SESSION,
+          payment_status: "paid",
+          currency: "sgd",
+          amount_total: 3600,
+          payment_intent: "pi_123",
+          metadata: {
+            order_id: ORDER,
+            shopper_id: SHOPPER.id,
+            slug: "field-notebook",
+            quantity: "2",
+          },
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetch);
+    expect(await checkoutResult(SESSION)).toEqual({
+      paid: true,
+      session: {
+        orderId: ORDER,
+        shopperId: SHOPPER.id,
+        slug: "field-notebook",
+        quantity: 2,
+        totalCents: 3600,
+        paymentId: "pi_123",
+      },
+    });
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(
+      `http://gateway:8080/v1/proxy/stripe/checkout/sessions/${SESSION}`,
+    );
+    expect(init.method).toBe("GET");
+  });
+
+  it("an unpaid session isn't paid, and a made up session ID never reaches Stripe", async () => {
+    const fetch = vi.fn(() =>
+      Promise.resolve(
+        reply(200, { payment_status: "unpaid", currency: "sgd", metadata: {} }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetch);
+    expect(await checkoutResult(SESSION)).toEqual({
+      paid: false,
+      reason: "unpaid",
+    });
+    for (const bad of ["", "cs_test_x/../../charges", "pi_123", "cs_test_"]) {
+      expect(await checkoutResult(bad)).toEqual({
+        paid: false,
+        reason: "unknown",
+      });
+    }
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it("a refusal by the platform's payment policy is a PlatformError with its own message", async () => {
@@ -122,7 +227,7 @@ describe("payments through the connection", () => {
         Promise.resolve(reply(403, platformError("PROXY_POLICY_DENIED"))),
       ),
     );
-    const error = await charge(129_900, "x").catch((e: unknown) => e);
+    const error = await startCheckout(order(129_900)).catch((e: unknown) => e);
     expect(error).toMatchObject({ status: 403, code: "PROXY_POLICY_DENIED" });
     expect(describeError(error)).toMatchObject({
       title: "Blocked by the payment policy",
@@ -135,7 +240,7 @@ describe("payments through the connection", () => {
       "fetch",
       vi.fn(() => Promise.resolve(reply(503, platformError("SECRETS_SEALED")))),
     );
-    await expect(charge(1800, "x")).rejects.toMatchObject({
+    await expect(startCheckout(order(1800))).rejects.toMatchObject({
       code: "SECRETS_SEALED",
     });
   });

@@ -258,10 +258,11 @@ jobs:
       - run: pnpm test:e2e
 
       - run: pnpm test:ui:install
-      - name: Connect the demo shop to the stack (test data only)
+      - name: Connect the demo shop to the stack (test data, Stripe test mode)
         run: pnpm demo:setup
         env:
           LOCAL_DEV_MODE: "true"
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
       - run: pnpm test:demo
 
       - run: pnpm test:ui

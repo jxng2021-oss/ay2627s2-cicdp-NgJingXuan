@@ -7,6 +7,8 @@ const PAGES = [
   ["/docs/files", "Files"],
   ["/docs/user-pools", "User sign in"],
   ["/docs/roles", "Roles and permissions"],
+  ["/docs/flags", "Feature flags"],
+  ["/docs/webhooks", "Payment webhooks"],
   ["/docs/express", "Express helpers"],
   ["/docs/errors", "Errors"],
 ] as const;

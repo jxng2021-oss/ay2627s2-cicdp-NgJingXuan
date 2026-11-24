@@ -101,10 +101,11 @@ export function createProxyService(options: ProxyRouteOptions) {
       }
       const body = await readSmallBody(request.raw, MAX_AMOUNT_BODY_BYTES);
       if (body === "too-large") return smallBodyOnly(reply);
-      const json = (request.headers["content-type"] ?? "").startsWith(
-        "application/json",
+      amount = amountFrom(
+        body,
+        amountLimit.field,
+        request.headers["content-type"] ?? "",
       );
-      amount = json ? amountFrom(body, amountLimit.field) : undefined;
       if (amount === undefined) return deny("amount_missing");
       if (amount > amountLimit.maxPerRequest) return deny("amount_too_high");
       pass.body = body;
@@ -393,7 +394,7 @@ function listedInConnection(value: string | string[] | undefined): Set<string> {
   );
 }
 
-function pinnedLookup(pinned: {
+export function pinnedLookup(pinned: {
   address: string;
   family: 4 | 6;
 }): LookupFunction {

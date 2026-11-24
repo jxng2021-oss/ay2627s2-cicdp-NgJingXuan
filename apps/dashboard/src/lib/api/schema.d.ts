@@ -518,6 +518,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboard/v1/workspaces/{workspaceId}/webhooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The workspace's webhook endpoints */
+        get: operations["listWebhookEndpoints"];
+        put?: never;
+        /** Create a webhook endpoint for Stripe (owners only) */
+        post: operations["createWebhookEndpoint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/v1/workspaces/{workspaceId}/webhooks/{endpointId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a webhook endpoint and its events (owners only) */
+        delete: operations["deleteWebhookEndpoint"];
+        options?: never;
+        head?: never;
+        /** Change a webhook endpoint's signing secret or delivery address (owners only) */
+        patch: operations["updateWebhookEndpoint"];
+        trace?: never;
+    };
+    "/dashboard/v1/workspaces/{workspaceId}/webhooks/{endpointId}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An endpoint's latest events and their delivery */
+        get: operations["listWebhookEndpointEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/v1/workspaces/{workspaceId}/webhooks/{endpointId}/events/{eventId}/redeliver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send an event to the dev app again (owners only) */
+        post: operations["redeliverWebhookEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dashboard/v1/workspaces/{workspaceId}/audit-events": {
         parameters: {
             query?: never;
@@ -6045,7 +6115,7 @@ export interface operations {
                                 /** @description For POST, PUT and PATCH calls: the body must be JSON (at most 16 KiB) with a whole, positive amount at `field`, at most `maxPerRequest`, and the day's total (UTC) at most `maxPerDay`. An amount is given back if the outside API answers with an error or can't be reached. */
                                 amountLimit?: {
                                     /**
-                                     * @description A top-level field of the JSON request body holding a whole, positive amount, e.g. `amount` (in the smallest unit, like cents).
+                                     * @description The field holding a whole, positive amount (in the smallest unit, like cents): a top-level field of a JSON body, e.g. `amount`, or a field of a form body, which may use brackets, e.g. `line_items[0][price_data][unit_amount]` (Stripe Checkout).
                                      * @example amount
                                      */
                                     field: string;
@@ -6401,7 +6471,7 @@ export interface operations {
                         /** @description For POST, PUT and PATCH calls: the body must be JSON (at most 16 KiB) with a whole, positive amount at `field`, at most `maxPerRequest`, and the day's total (UTC) at most `maxPerDay`. An amount is given back if the outside API answers with an error or can't be reached. */
                         amountLimit?: {
                             /**
-                             * @description A top-level field of the JSON request body holding a whole, positive amount, e.g. `amount` (in the smallest unit, like cents).
+                             * @description The field holding a whole, positive amount (in the smallest unit, like cents): a top-level field of a JSON body, e.g. `amount`, or a field of a form body, which may use brackets, e.g. `line_items[0][price_data][unit_amount]` (Stripe Checkout).
                              * @example amount
                              */
                             field: string;
@@ -6489,7 +6559,7 @@ export interface operations {
                             /** @description For POST, PUT and PATCH calls: the body must be JSON (at most 16 KiB) with a whole, positive amount at `field`, at most `maxPerRequest`, and the day's total (UTC) at most `maxPerDay`. An amount is given back if the outside API answers with an error or can't be reached. */
                             amountLimit?: {
                                 /**
-                                 * @description A top-level field of the JSON request body holding a whole, positive amount, e.g. `amount` (in the smallest unit, like cents).
+                                 * @description The field holding a whole, positive amount (in the smallest unit, like cents): a top-level field of a JSON body, e.g. `amount`, or a field of a form body, which may use brackets, e.g. `line_items[0][price_data][unit_amount]` (Stripe Checkout).
                                  * @example amount
                                  */
                                 field: string;
@@ -6580,7 +6650,7 @@ export interface operations {
                             /** @description For POST, PUT and PATCH calls: the body must be JSON (at most 16 KiB) with a whole, positive amount at `field`, at most `maxPerRequest`, and the day's total (UTC) at most `maxPerDay`. An amount is given back if the outside API answers with an error or can't be reached. */
                             amountLimit?: {
                                 /**
-                                 * @description A top-level field of the JSON request body holding a whole, positive amount, e.g. `amount` (in the smallest unit, like cents).
+                                 * @description The field holding a whole, positive amount (in the smallest unit, like cents): a top-level field of a JSON body, e.g. `amount`, or a field of a form body, which may use brackets, e.g. `line_items[0][price_data][unit_amount]` (Stripe Checkout).
                                  * @example amount
                                  */
                                 field: string;
@@ -7676,6 +7746,1004 @@ export interface operations {
             };
         };
     };
+    listWebhookEndpoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Endpoints */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        endpoints: {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            /** @enum {unknown} */
+                            provider: "stripe";
+                            /** @description The secure-cloud secret holding Stripe's signing secret (whsec_...) */
+                            signingSecretName: string;
+                            /** @description Where secure-cloud pushes events; null: the dev app pulls */
+                            forwardUrl: string | null;
+                            /** @description Paste this into Stripe as the webhook endpoint URL */
+                            stripeUrl: string;
+                            /** Format: date-time */
+                            createdAt: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description BAD_REQUEST: invalid input. */
+            400: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "BAD_REQUEST",
+                     *         "message": "Invalid input",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description UNAUTHORIZED: not signed in, or the session expired. */
+            401: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "UNAUTHORIZED",
+                     *         "message": "Sign in first",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description NOT_FOUND: no such workspace, endpoint or event (or you aren't a member). */
+            404: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "NOT_FOUND",
+                     *         "message": "Webhook endpoint not found",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description CONFLICT: the workspace is being deleted (crypto-shredded). Only finishing the deletion is possible. */
+            409: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "CONFLICT",
+                     *         "message": "This workspace is being deleted",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    createWebhookEndpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    signingSecretName: string;
+                    forwardUrl: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        name: string;
+                        /** @enum {unknown} */
+                        provider: "stripe";
+                        /** @description The secure-cloud secret holding Stripe's signing secret (whsec_...) */
+                        signingSecretName: string;
+                        /** @description Where secure-cloud pushes events; null: the dev app pulls */
+                        forwardUrl: string | null;
+                        /** @description Paste this into Stripe as the webhook endpoint URL */
+                        stripeUrl: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                    };
+                };
+            };
+            /** @description BAD_REQUEST: invalid input. */
+            400: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "BAD_REQUEST",
+                     *         "message": "Invalid input",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description UNAUTHORIZED: not signed in, or the session expired. */
+            401: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "UNAUTHORIZED",
+                     *         "message": "Sign in first",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description FORBIDDEN: only workspace owners can do this (or a CSRF/Origin problem). */
+            403: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "FORBIDDEN",
+                     *         "message": "Only workspace owners can do this",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description NOT_FOUND: no such workspace, endpoint or event (or you aren't a member). */
+            404: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "NOT_FOUND",
+                     *         "message": "Webhook endpoint not found",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description CONFLICT: the name is taken, there are already 10 endpoints, or the workspace is being deleted. */
+            409: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "CONFLICT",
+                     *         "message": "A webhook endpoint with this name already exists",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    deleteWebhookEndpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: string;
+                endpointId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description BAD_REQUEST: invalid input. */
+            400: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "BAD_REQUEST",
+                     *         "message": "Invalid input",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description UNAUTHORIZED: not signed in, or the session expired. */
+            401: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "UNAUTHORIZED",
+                     *         "message": "Sign in first",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description FORBIDDEN: only workspace owners can do this (or a CSRF/Origin problem). */
+            403: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "FORBIDDEN",
+                     *         "message": "Only workspace owners can do this",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description NOT_FOUND: no such workspace, endpoint or event (or you aren't a member). */
+            404: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "NOT_FOUND",
+                     *         "message": "Webhook endpoint not found",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description CONFLICT: the workspace is being deleted (crypto-shredded). Only finishing the deletion is possible. */
+            409: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "CONFLICT",
+                     *         "message": "This workspace is being deleted",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    updateWebhookEndpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: string;
+                endpointId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    signingSecretName?: string;
+                    forwardUrl?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        name: string;
+                        /** @enum {unknown} */
+                        provider: "stripe";
+                        /** @description The secure-cloud secret holding Stripe's signing secret (whsec_...) */
+                        signingSecretName: string;
+                        /** @description Where secure-cloud pushes events; null: the dev app pulls */
+                        forwardUrl: string | null;
+                        /** @description Paste this into Stripe as the webhook endpoint URL */
+                        stripeUrl: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                    };
+                };
+            };
+            /** @description BAD_REQUEST: invalid input. */
+            400: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "BAD_REQUEST",
+                     *         "message": "Invalid input",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description UNAUTHORIZED: not signed in, or the session expired. */
+            401: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "UNAUTHORIZED",
+                     *         "message": "Sign in first",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description FORBIDDEN: only workspace owners can do this (or a CSRF/Origin problem). */
+            403: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "FORBIDDEN",
+                     *         "message": "Only workspace owners can do this",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description NOT_FOUND: no such workspace, endpoint or event (or you aren't a member). */
+            404: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "NOT_FOUND",
+                     *         "message": "Webhook endpoint not found",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description CONFLICT: the workspace is being deleted (crypto-shredded). Only finishing the deletion is possible. */
+            409: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "CONFLICT",
+                     *         "message": "This workspace is being deleted",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    listWebhookEndpointEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: string;
+                endpointId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The latest 50 events, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        events: {
+                            /** Format: uuid */
+                            id: string;
+                            event: string;
+                            providerEventId: string;
+                            orderId: string | null;
+                            amount: number | null;
+                            currency: string | null;
+                            paymentId: string | null;
+                            reason: string | null;
+                            /** Format: date-time */
+                            occurredAt: string;
+                            /** Format: date-time */
+                            receivedAt: string;
+                            /** @enum {unknown} */
+                            deliveryStatus: "pending" | "delivered" | "failed" | "pull";
+                            attempts: number;
+                            lastError: string | null;
+                            /** Format: date-time */
+                            deliveredAt: string | null;
+                        }[];
+                    };
+                };
+            };
+            /** @description BAD_REQUEST: invalid input. */
+            400: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "BAD_REQUEST",
+                     *         "message": "Invalid input",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description UNAUTHORIZED: not signed in, or the session expired. */
+            401: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "UNAUTHORIZED",
+                     *         "message": "Sign in first",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description NOT_FOUND: no such workspace, endpoint or event (or you aren't a member). */
+            404: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "NOT_FOUND",
+                     *         "message": "Webhook endpoint not found",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description CONFLICT: the workspace is being deleted (crypto-shredded). Only finishing the deletion is possible. */
+            409: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "CONFLICT",
+                     *         "message": "This workspace is being deleted",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    redeliverWebhookEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: string;
+                endpointId: string;
+                eventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued for delivery */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description BAD_REQUEST: invalid input. */
+            400: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "BAD_REQUEST",
+                     *         "message": "Invalid input",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description UNAUTHORIZED: not signed in, or the session expired. */
+            401: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "UNAUTHORIZED",
+                     *         "message": "Sign in first",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description FORBIDDEN: only workspace owners can do this (or a CSRF/Origin problem). */
+            403: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "FORBIDDEN",
+                     *         "message": "Only workspace owners can do this",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description NOT_FOUND: no such workspace, endpoint or event (or you aren't a member). */
+            404: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "NOT_FOUND",
+                     *         "message": "Webhook endpoint not found",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+            /** @description CONFLICT: the workspace is being deleted (crypto-shredded). Only finishing the deletion is possible. */
+            409: {
+                headers: {
+                    /** @description Unique ID of this request, generated by the gateway */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "CONFLICT",
+                     *         "message": "This workspace is being deleted",
+                     *         "requestId": "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70"
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        error: {
+                            /** @description Stable, machine-readable error code */
+                            code: string;
+                            message: string;
+                            /** Format: uuid */
+                            requestId: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     listAuditEvents: {
         parameters: {
             query?: {
@@ -7684,10 +8752,10 @@ export interface operations {
                 /** @description Only events before this time (ISO 8601) */
                 to?: string;
                 /** @description What happened */
-                action?: "tenant.created" | "tenant.suspended" | "api_key.created" | "api_key.revoked" | "proxy_connection.created" | "proxy_connection.updated" | "proxy_connection.deleted" | "proxy_connection.used" | "proxy_connection.denied" | "secret.created" | "secret.read" | "secret.rotated" | "secret.deleted" | "file.uploaded" | "file.downloaded" | "file.deleted" | "user.signed_up" | "user.logged_in" | "user.login_failed" | "user.logged_out" | "user.password_changed" | "membership.added" | "membership.removed" | "user.profile_updated" | "user.session_revoked" | "user.deleted" | "user_pool.created" | "user_pool.updated" | "user_pool.deleted" | "pool_user.signed_up" | "pool_user.updated" | "pool_user.deleted" | "pool_user.password_reset" | "pool_user.password_changed" | "pool_user.logged_in" | "pool_user.login_failed" | "pool_user.logged_out" | "pool_user.token_reused" | "pool_role.created" | "pool_role.updated" | "pool_role.deleted" | "pool_user.role_added" | "pool_user.role_removed" | "feature_flag.created" | "feature_flag.updated" | "feature_flag.toggled" | "feature_flag.deleted" | "secret.revealed";
+                action?: "tenant.created" | "tenant.suspended" | "api_key.created" | "api_key.revoked" | "proxy_connection.created" | "proxy_connection.updated" | "proxy_connection.deleted" | "proxy_connection.used" | "proxy_connection.denied" | "secret.created" | "secret.read" | "secret.rotated" | "secret.deleted" | "file.uploaded" | "file.downloaded" | "file.deleted" | "user.signed_up" | "user.logged_in" | "user.login_failed" | "user.logged_out" | "user.password_changed" | "membership.added" | "membership.removed" | "user.profile_updated" | "user.session_revoked" | "user.deleted" | "user_pool.created" | "user_pool.updated" | "user_pool.deleted" | "pool_user.signed_up" | "pool_user.updated" | "pool_user.deleted" | "pool_user.password_reset" | "pool_user.password_changed" | "pool_user.logged_in" | "pool_user.login_failed" | "pool_user.logged_out" | "pool_user.token_reused" | "pool_role.created" | "pool_role.updated" | "pool_role.deleted" | "pool_user.role_added" | "pool_user.role_removed" | "feature_flag.created" | "feature_flag.updated" | "feature_flag.toggled" | "feature_flag.deleted" | "secret.revealed" | "webhook_endpoint.created" | "webhook_endpoint.updated" | "webhook_endpoint.deleted";
                 /** @description success; denied (e.g. a proxy target that isn't allowed); failure */
                 outcome?: "success" | "denied" | "failure";
-                resourceType?: "tenant" | "api_key" | "proxy_connection" | "secret" | "file" | "user" | "membership" | "user_pool" | "pool_user" | "pool_role" | "feature_flag";
+                resourceType?: "tenant" | "api_key" | "proxy_connection" | "secret" | "file" | "user" | "membership" | "user_pool" | "pool_user" | "pool_role" | "feature_flag" | "webhook_endpoint";
                 /** @description e.g. a file ID or a secret's name */
                 resourceId?: string;
                 /** @description Page size (1-100, default 50) */
@@ -7753,9 +8821,9 @@ export interface operations {
                              * @description What happened
                              * @enum {unknown}
                              */
-                            action: "tenant.created" | "tenant.suspended" | "api_key.created" | "api_key.revoked" | "proxy_connection.created" | "proxy_connection.updated" | "proxy_connection.deleted" | "proxy_connection.used" | "proxy_connection.denied" | "secret.created" | "secret.read" | "secret.rotated" | "secret.deleted" | "file.uploaded" | "file.downloaded" | "file.deleted" | "user.signed_up" | "user.logged_in" | "user.login_failed" | "user.logged_out" | "user.password_changed" | "membership.added" | "membership.removed" | "user.profile_updated" | "user.session_revoked" | "user.deleted" | "user_pool.created" | "user_pool.updated" | "user_pool.deleted" | "pool_user.signed_up" | "pool_user.updated" | "pool_user.deleted" | "pool_user.password_reset" | "pool_user.password_changed" | "pool_user.logged_in" | "pool_user.login_failed" | "pool_user.logged_out" | "pool_user.token_reused" | "pool_role.created" | "pool_role.updated" | "pool_role.deleted" | "pool_user.role_added" | "pool_user.role_removed" | "feature_flag.created" | "feature_flag.updated" | "feature_flag.toggled" | "feature_flag.deleted" | "secret.revealed";
+                            action: "tenant.created" | "tenant.suspended" | "api_key.created" | "api_key.revoked" | "proxy_connection.created" | "proxy_connection.updated" | "proxy_connection.deleted" | "proxy_connection.used" | "proxy_connection.denied" | "secret.created" | "secret.read" | "secret.rotated" | "secret.deleted" | "file.uploaded" | "file.downloaded" | "file.deleted" | "user.signed_up" | "user.logged_in" | "user.login_failed" | "user.logged_out" | "user.password_changed" | "membership.added" | "membership.removed" | "user.profile_updated" | "user.session_revoked" | "user.deleted" | "user_pool.created" | "user_pool.updated" | "user_pool.deleted" | "pool_user.signed_up" | "pool_user.updated" | "pool_user.deleted" | "pool_user.password_reset" | "pool_user.password_changed" | "pool_user.logged_in" | "pool_user.login_failed" | "pool_user.logged_out" | "pool_user.token_reused" | "pool_role.created" | "pool_role.updated" | "pool_role.deleted" | "pool_user.role_added" | "pool_user.role_removed" | "feature_flag.created" | "feature_flag.updated" | "feature_flag.toggled" | "feature_flag.deleted" | "secret.revealed" | "webhook_endpoint.created" | "webhook_endpoint.updated" | "webhook_endpoint.deleted";
                             /** @enum {unknown} */
-                            resourceType: "tenant" | "api_key" | "proxy_connection" | "secret" | "file" | "user" | "membership" | "user_pool" | "pool_user" | "pool_role" | "feature_flag";
+                            resourceType: "tenant" | "api_key" | "proxy_connection" | "secret" | "file" | "user" | "membership" | "user_pool" | "pool_user" | "pool_role" | "feature_flag" | "webhook_endpoint";
                             /** @description The file ID, secret name, key ID, connection name... */
                             resourceId: string | null;
                             /**

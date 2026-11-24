@@ -680,3 +680,193 @@ describe("roles", () => {
     expect(signedOut.res.code).toBe(401);
   });
 });
+
+describe("feature flags", () => {
+  const answer = {
+    flags: {
+      "new-checkout": { value: true, reason: "rule", ruleIndex: 0 },
+      variant: { value: "blue", reason: "default" },
+    },
+  };
+
+  it("asks for the user's flags in one environment, with their ID as key and email as an attribute", async () => {
+    const gateway = await fakeGateway((_req, res) => json(res, 200, answer));
+    const cloud = new SecureCloud({ apiKey: API_KEY, url: gateway.url });
+
+    const flags = await cloud.flags("staging").evaluate({
+      id: "user-7",
+      email: "ada@example.com",
+      attributes: { plan: "pro" },
+    });
+
+    expect(flags["new-checkout"]).toEqual({
+      value: true,
+      reason: "rule",
+      ruleIndex: 0,
+    });
+    const [request] = gateway.seen;
+    expect(request).toMatchObject({
+      method: "POST",
+      path: "/v1/flags/evaluate",
+    });
+    expect(request!.headers.authorization).toBe(`Bearer ${API_KEY}`);
+    expect(JSON.parse(request!.body.toString())).toEqual({
+      environment: "staging",
+      context: {
+        key: "user-7",
+        attributes: { plan: "pro", email: "ada@example.com" },
+      },
+    });
+  });
+
+  it("isOn() and value() ask for one flag; a missing flag is off or the fallback", async () => {
+    const gateway = await fakeGateway((_req, res) => json(res, 200, answer));
+    const cloud = new SecureCloud({ apiKey: API_KEY, url: gateway.url });
+    const flags = cloud.flags("production");
+
+    expect(await flags.isOn("new-checkout", { id: "u1" })).toBe(true);
+    expect(await flags.isOn("not-a-flag", { id: "u1" })).toBe(false);
+    expect(await flags.value("variant", { id: "u1" }, "control")).toBe("blue");
+    expect(await flags.value("not-a-flag", { id: "u1" }, "control")).toBe(
+      "control",
+    );
+    expect(JSON.parse(gateway.seen[0]!.body.toString())).toMatchObject({
+      environment: "production",
+      keys: ["new-checkout"],
+    });
+  });
+
+  it("uses SECURE_CLOUD_ENVIRONMENT, then production, and refuses other names", async () => {
+    const gateway = await fakeGateway((_req, res) => json(res, 200, answer));
+    const cloud = new SecureCloud({ apiKey: API_KEY, url: gateway.url });
+
+    expect(cloud.flags().environment).toBe("production");
+    vi.stubEnv("SECURE_CLOUD_ENVIRONMENT", "development");
+    expect(new SecureCloud({ apiKey: API_KEY }).flags().environment).toBe(
+      "development",
+    );
+    vi.unstubAllEnvs();
+    expect(() => cloud.flags("prod" as "production")).toThrow(
+      expect.objectContaining({ code: "INVALID_ENVIRONMENT" }),
+    );
+    await expect(cloud.flags().isOn("x", { id: "" })).rejects.toMatchObject({
+      code: "MISSING_USER_ID",
+    });
+    expect(gateway.seen).toEqual([]);
+  });
+
+  it("platform errors keep their code", async () => {
+    const gateway = await fakeGateway((_req, res) =>
+      platformError(res, 401, "UNAUTHORIZED"),
+    );
+    const cloud = new SecureCloud({ apiKey: API_KEY, url: gateway.url });
+
+    await expect(
+      cloud.flags().isOn("new-checkout", { id: "u1" }),
+    ).rejects.toBeInstanceOf(SecureCloudError);
+  });
+});
+
+describe("webhooks", () => {
+  const webhookKey = generateKeyPairSync("ec", { namedCurve: "P-256" });
+  const WEBHOOK_JWK = {
+    ...webhookKey.publicKey.export({ format: "jwk" }),
+    kid: "webhook-key-1",
+    alg: "ES256",
+    use: "sig",
+  };
+  const ENDPOINT = "5d7e1f2a-3b4c-4d5e-8f60-718293a4b5c6";
+  const event = {
+    id: "0f1e2d3c-4b5a-4968-8776-655443322110",
+    endpointId: ENDPOINT,
+    event: "payment.succeeded",
+    provider: "stripe",
+    providerEventId: "evt_1",
+    orderId: "order-7",
+    amount: 3600,
+    currency: "sgd",
+    paymentId: "pi_1",
+    reason: null,
+    occurredAt: "2026-11-24T09:00:00.000Z",
+  };
+  const signed = (body: string, at = Date.now(), kid = "webhook-key-1") => {
+    const t = Math.floor(at / 1000);
+    const signature = sign("sha256", Buffer.from(`${t}.${body}`), {
+      key: webhookKey.privateKey,
+      dsaEncoding: "ieee-p1363",
+    }).toString("base64url");
+    return `t=${t},kid=${kid},es256=${signature}`;
+  };
+  const keysGateway = () =>
+    fakeGateway((req, res) =>
+      req.path === "/v1/webhooks/keys"
+        ? json(res, 200, { keys: [WEBHOOK_JWK] })
+        : json(res, 200, { events: [event], next: "7" }),
+    );
+
+  it("checks secure-cloud's signature with the public key, without sending the API key", async () => {
+    const gateway = await keysGateway();
+    const cloud = new SecureCloud({ apiKey: API_KEY, url: gateway.url });
+    const body = JSON.stringify(event);
+
+    await expect(
+      cloud.webhooks.verify(body, signed(body), { endpointId: ENDPOINT }),
+    ).resolves.toEqual(event);
+    await cloud.webhooks.verify(Buffer.from(body), signed(body));
+    const keyFetches = gateway.seen.filter(
+      (r) => r.path === "/v1/webhooks/keys",
+    );
+    expect(keyFetches).toHaveLength(1);
+    expect(keyFetches[0]!.headers.authorization).toBeUndefined();
+  });
+
+  it("refuses changed bodies, old or missing signatures, unknown keys and other endpoints", async () => {
+    const gateway = await keysGateway();
+    const cloud = new SecureCloud({ apiKey: API_KEY, url: gateway.url });
+    const body = JSON.stringify(event);
+    const refused = async (promise: Promise<unknown>, why: RegExp) => {
+      const error = await promise.catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(SecureCloudError);
+      expect((error as SecureCloudError).code).toBe(
+        "INVALID_WEBHOOK_SIGNATURE",
+      );
+      expect((error as SecureCloudError).message).toMatch(why);
+    };
+
+    await refused(
+      cloud.webhooks.verify(body.replace("3600", "1"), signed(body)),
+      /signature is wrong/,
+    );
+    await refused(
+      cloud.webhooks.verify(body, undefined),
+      /no X-SecureCloud-Signature/,
+    );
+    await refused(
+      cloud.webhooks.verify(body, signed(body, Date.now() - 10 * 60_000)),
+      /too old/,
+    );
+    await refused(
+      cloud.webhooks.verify(body, signed(body, Date.now(), "someone-else")),
+      /wasn't signed by secure-cloud/,
+    );
+    await refused(
+      cloud.webhooks.verify(body, signed(body), {
+        endpointId: "00000000-0000-4000-8000-000000000000",
+      }),
+      /another webhook endpoint/,
+    );
+  });
+
+  it("pulls events after a position, with the API key", async () => {
+    const gateway = await keysGateway();
+    const cloud = new SecureCloud({ apiKey: API_KEY, url: gateway.url });
+
+    await expect(
+      cloud.webhooks.events({ after: "3", endpointId: ENDPOINT }),
+    ).resolves.toEqual({ events: [event], next: "7" });
+    expect(gateway.seen[0]!.path).toBe(
+      `/v1/webhook-events?after=3&endpointId=${ENDPOINT}`,
+    );
+    expect(gateway.seen[0]!.headers.authorization).toBe(`Bearer ${API_KEY}`);
+  });
+});

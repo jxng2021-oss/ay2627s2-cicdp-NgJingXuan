@@ -156,6 +156,50 @@ test("connections: create and remove (confirmed)", async () => {
   await expect(page.getByText("No connections yet.")).toBeVisible();
 });
 
+test("webhooks: create an endpoint with a Stripe secret, copy its address, delete it (confirmed)", async () => {
+  await openSection(page, "Secrets");
+  await page.getByRole("button", { name: "Create secret" }).click();
+  const secretForm = page.getByRole("dialog", { name: "Create secret" });
+  await secretForm.getByLabel("Name").fill("stripe-webhook-secret");
+  await secretForm.getByLabel("Value").fill("whsec_uitest0123456789abcdef");
+  await secretForm.getByRole("button", { name: "Save secret" }).click();
+  await expect(
+    page.getByRole("row", { name: /stripe-webhook-secret/ }),
+  ).toBeVisible();
+
+  await openSection(page, "Webhooks");
+  await expect(page.getByText("No webhook endpoints yet.")).toBeVisible();
+  await page.getByRole("button", { name: "Create endpoint" }).click();
+  const form = page.getByRole("dialog", { name: "Create a webhook endpoint" });
+  await form.getByRole("button", { name: "Create endpoint" }).click();
+  await expect(form.getByText("Choose one of your secrets.")).toBeVisible();
+  await form
+    .getByLabel("Stripe signing secret")
+    .selectOption("stripe-webhook-secret");
+  await form.getByRole("button", { name: "Create endpoint" }).click();
+
+  const endpoint = page.getByRole("region", { name: "stripe" });
+  await expect(
+    endpoint.getByText("Your dev app pulls", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    endpoint.getByText(/\/v1\/webhooks\/[0-9a-f-]{36}/),
+  ).toBeVisible();
+  await expect(endpoint.getByText("No events yet.")).toBeVisible();
+  await expect(page.getByText("whsec_uitest")).toHaveCount(0);
+  await endpoint.getByRole("button", { name: "Copy Stripe address" }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(
+    /\/v1\/webhooks\/[0-9a-f-]{36}$/,
+  );
+
+  await endpoint.getByRole("button", { name: "Delete endpoint" }).click();
+  await page
+    .getByRole("dialog", { name: "Delete the stripe endpoint?" })
+    .getByRole("button", { name: "Delete endpoint" })
+    .click();
+  await expect(page.getByText("No webhook endpoints yet.")).toBeVisible();
+});
+
 test("the audit log shows the matching events, with request IDs, and filters", async () => {
   await openSection(page, "Audit log");
   for (const action of [
@@ -299,36 +343,42 @@ test("user pools: create one, see how to connect, and delete it (confirmed)", as
   await expect(page.getByText("No user pools yet.")).toBeVisible();
 });
 
-test("feature flags: create one, target it in production, and test a user", async () => {
+test("feature flags: create one, choose who sees it in production, and check a user", async () => {
   await openSection(page, "Feature flags");
   await expect(page.getByText("No flags yet.")).toBeVisible();
   await page.getByRole("button", { name: "Create flag" }).click();
   const dialog = page.getByRole("dialog", { name: "Create flag" });
-  await dialog.getByLabel("Key").fill("Sale Banner");
+  const name = dialog.getByRole("textbox", { name: "Name" });
+  await name.fill("Sale Banner");
   await dialog.getByRole("button", { name: "Create flag" }).click();
   await expect(dialog.getByText(/lowercase letters/)).toBeVisible();
-  await dialog.getByLabel("Key").fill("sale-banner");
+  await name.fill("sale-banner");
   await dialog.getByRole("button", { name: "Create flag" }).click();
 
-  await page.getByRole("link", { name: "Details of sale-banner" }).click();
   await expect(
     page.getByRole("heading", { level: 1, name: "sale-banner" }),
   ).toBeVisible();
-  await page.getByLabel("Flag is on in production").check();
-  await page.getByRole("button", { name: "Add rule" }).click();
-  await page.getByLabel("Attribute", { exact: true }).fill("country");
-  await page.getByLabel("Values", { exact: true }).fill("SG");
+  await expect(page.getByText(/Off: every user can't see it/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Add users by email" }).click();
+  const picker = page.getByRole("dialog", { name: "Add users by email" });
+  await expect(
+    picker.getByText(/no user pools in this workspace/),
+  ).toBeVisible();
+  await picker.getByRole("button", { name: "Close" }).click();
+
+  await page.getByRole("switch", { name: /Turn on in production/ }).check();
+  await page.getByLabel("Everyone else", { exact: true }).selectOption("true");
+  await expect(page.getByText("Every user can see it.")).toBeVisible();
   await page.getByRole("button", { name: "Save production" }).click();
   await expect(page.getByText("sale-banner saved in production")).toBeVisible();
 
-  await page.getByLabel("Attributes").fill("country=SG");
-  await page.getByRole("button", { name: "Test", exact: true }).click();
+  await page.getByLabel("User ID").fill("user-7");
+  await page.getByRole("button", { name: "Check", exact: true }).click();
   await expect(
-    page.getByRole("status").filter({ hasText: "Serves" }),
-  ).toContainText("Serves true: rule 1 matched");
-  await page.getByLabel("Attributes").fill("country=MY");
-  await page.getByRole("button", { name: "Test", exact: true }).click();
-  await expect(
-    page.getByRole("status").filter({ hasText: "Serves" }),
-  ).toContainText("Serves false");
+    page.getByRole("status").filter({ hasText: "Result" }),
+  ).toContainText("Can see it, because they aren't a chosen user");
+
+  await page.getByRole("link", { name: "All flags" }).click();
+  await expect(page.getByText("On for everyone")).toBeVisible();
 });

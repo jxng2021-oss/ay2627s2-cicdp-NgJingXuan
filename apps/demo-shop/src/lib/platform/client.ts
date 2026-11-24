@@ -2,7 +2,9 @@ import { Readable } from "node:stream";
 import {
   SecureCloud,
   SecureCloudError,
+  type CallOptions,
   type FileInfo,
+  type WebhookEvent,
 } from "@secure-cloud/sdk";
 import type { paths } from "./schema";
 
@@ -177,8 +179,9 @@ export async function viaConnection<T>(
   connection: string,
   route: string,
   body?: unknown,
+  options?: CallOptions,
 ) {
-  return cloud().connections.call<T>(connection, route, body);
+  return cloud().connections.call<T>(connection, route, body, options);
 }
 
 export async function listConnections(): Promise<Connection[]> {
@@ -249,26 +252,41 @@ export async function signOutShopper(refreshToken: string): Promise<void> {
   return shoppers().signOut(refreshToken);
 }
 
-const jsonBody = (body: unknown): Init => ({
-  method: "POST",
-  headers: { "content-type": "application/json" },
-  body: JSON.stringify(body),
-});
-
-export type FlagValues = Ok<"/v1/flags/evaluate", "post", 200>["flags"];
-
-export async function evaluateFlags(context: {
-  key: string;
-  attributes?: Record<string, string | number | boolean>;
-}): Promise<FlagValues> {
+export function flagIsOn(
+  key: string,
+  shopper: { id: string; email: string } | undefined,
+): Promise<boolean> {
   const environment =
     process.env.DEMO_FLAGS_ENVIRONMENT === "staging" ||
     process.env.DEMO_FLAGS_ENVIRONMENT === "development"
       ? process.env.DEMO_FLAGS_ENVIRONMENT
       : "production";
-  const answer = await json<Ok<"/v1/flags/evaluate", "post", 200>>(
-    "/v1/flags/evaluate",
-    jsonBody({ environment, context }),
-  );
-  return answer.flags;
+  return cloud()
+    .flags(environment)
+    .isOn(key, {
+      id: shopper?.id ?? "visitor",
+      email: shopper?.email,
+      attributes: { signedIn: shopper !== undefined },
+    });
+}
+
+export function webhookEndpoint(): string | null {
+  const id = process.env.PLATFORM_WEBHOOK_ENDPOINT_ID;
+  return id && /^[0-9a-f-]{36}$/.test(id) ? id : null;
+}
+
+export function verifyWebhook(
+  rawBody: string,
+  signature: string | null,
+): Promise<WebhookEvent> {
+  return cloud().webhooks.verify(rawBody, signature ?? undefined, {
+    endpointId: webhookEndpoint() ?? undefined,
+  });
+}
+
+export function pullWebhookEvents(after: string | undefined) {
+  return cloud().webhooks.events({
+    after,
+    endpointId: webhookEndpoint() ?? undefined,
+  });
 }

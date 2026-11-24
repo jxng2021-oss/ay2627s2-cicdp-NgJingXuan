@@ -4,6 +4,8 @@ import { DEFAULT_REFRESH_GRACE_MS } from "./services/session.service.js";
 import { API_KEY_PREFIX_PATTERN } from "./services/api-key-tokens.service.js";
 import type { RateLimitSettings } from "./limits.js";
 import type { OAuthClient, OAuthSettings } from "./services/oauth.service.js";
+import { parseWebhookSigningKey } from "./services/webhook-signing.service.js";
+import type { KeyObject } from "node:crypto";
 import type { ProxyPolicy } from "./services/ssrf.service.js";
 
 export interface GatewayConfig {
@@ -32,6 +34,7 @@ export interface GatewayConfig {
   auditTimeoutMs: number;
   version: string;
   dashboard: DashboardSettings;
+  webhookSigningKey: KeyObject;
   adminApiEnabled: boolean;
   shutdownTimeoutMs: number;
 }
@@ -90,6 +93,10 @@ export function loadConfig(
     version: env.SERVICE_VERSION ?? "dev",
     dashboard: parseDashboard(env, number),
     adminApiEnabled: parseAdminApiEnabled(env),
+    webhookSigningKey: parseWebhookSigningKey(
+      env.WEBHOOK_SIGNING_KEY,
+      env.NODE_ENV === "production",
+    ),
     shutdownTimeoutMs: number("SHUTDOWN_TIMEOUT_MS", 25_000),
   };
 }

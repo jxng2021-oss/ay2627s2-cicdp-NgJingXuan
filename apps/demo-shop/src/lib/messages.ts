@@ -6,6 +6,32 @@ export interface ErrorView {
   requestId?: string;
 }
 
+const PAYMENT_PROBLEMS: Record<string, ErrorView> = {
+  cancelled: {
+    title: "Payment cancelled",
+    message: "You left Stripe's payment page. Nothing was charged.",
+  },
+  unpaid: {
+    title: "Payment not completed",
+    message:
+      "Stripe hasn't confirmed this payment, so no order was made. Nothing was charged.",
+  },
+  unknown: {
+    title: "Payment not found",
+    message:
+      "That payment doesn't belong to this account, or Stripe doesn't know it. No order was made.",
+  },
+  error: {
+    title: "Couldn't check the payment",
+    message:
+      "The platform or Stripe didn't answer. If you paid, reload this page in a moment.",
+  },
+};
+
+export function paymentProblem(value: string | string[] | undefined) {
+  return typeof value === "string" ? PAYMENT_PROBLEMS[value] : undefined;
+}
+
 export function describeError(error: unknown): ErrorView {
   if (!(error instanceof PlatformError)) {
     return {
@@ -24,7 +50,7 @@ export function describeError(error: unknown): ErrorView {
       return {
         title: "Temporarily unavailable",
         message:
-          "The platform's secrets service is sealed, so payments, photos and receipts can't be used. Unseal it, then retry.",
+          "The platform's secrets service is sealed, so payments and photos can't be used. Unseal it, then retry.",
         requestId: error.requestId,
       };
     case "PLATFORM_UNREACHABLE":
@@ -38,7 +64,7 @@ export function describeError(error: unknown): ErrorView {
       return {
         title: "Blocked by the payment policy",
         message:
-          "The platform's policy for this shop's payments refused this order (over S$500 a charge or S$2,000 a day). Nothing was charged, and the payment key was never used.",
+          "The platform's policy for this shop's Stripe payments refused this order (over S$500 a charge or S$2,000 a day). Nothing was charged, and the Stripe key was never used.",
         requestId: error.requestId,
       };
     case "PROXY_RATE_LIMITED":

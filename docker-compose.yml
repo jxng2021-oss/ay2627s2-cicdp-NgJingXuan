@@ -67,6 +67,10 @@ services:
       # until both its values are set in .env. Register this callback with
       # the provider: GATEWAY_PUBLIC_ORIGIN/dashboard/v1/auth/oauth/<google|github>/callback
       GATEWAY_PUBLIC_ORIGIN: ${GATEWAY_PUBLIC_ORIGIN:-http://localhost:8080}
+      # Webhooks (docs/decisions/0040): the private key that signs events
+      # sent to dev apps. Locally leave it empty: the gateway makes one at
+      # start (dev apps fetch the public key from /v1/webhooks/keys).
+      WEBHOOK_SIGNING_KEY: ${WEBHOOK_SIGNING_KEY:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
@@ -93,12 +97,13 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-false}
       # Interactive API docs at /docs (off unless set to true)
       API_DOCS_ENABLED: ${API_DOCS_ENABLED:-false}
-      # Proxy route (secret injection, docs/decisions/0013). Locally the only
-      # allowed target is the pretend outside API below, which is plain
-      # http:// on a private address: PROXY_ALLOW_PRIVATE_TARGETS allows that,
+      # Proxy route (secret injection, docs/decisions/0013). Locally the
+      # allowed targets are Stripe (the demo shop's payments, test mode) and
+      # the pretend outside API below that secure-cloud's own tests use, which
+      # is plain http:// on a private address: PROXY_ALLOW_PRIVATE_TARGETS allows that,
       # and NODE_ENV=development is needed for it (the gateway refuses to
       # start with it in production). Never use these settings on a server.
-      PROXY_ALLOWED_HOSTS: ${PROXY_ALLOWED_HOSTS:-mock-upstream}
+      PROXY_ALLOWED_HOSTS: ${PROXY_ALLOWED_HOSTS:-mock-upstream,api.stripe.com,demo-shop}
       PROXY_ALLOW_PRIVATE_TARGETS: ${PROXY_ALLOW_PRIVATE_TARGETS:-true}
       NODE_ENV: development
       MAX_HEADER_BYTES: 16384
@@ -550,12 +555,20 @@ services:
     environment:
       # The gateway, reached from this container (not from browsers).
       PLATFORM_API_URL: http://gateway:8080
+      # Where Stripe's payment page sends customers back to (the browser's
+      # address for this shop).
+      SHOP_URL: http://localhost:${DEMO_SHOP_PORT:-3100}
+      # The shop's OWN database (its orders), not secure-cloud's.
+      SHOP_DATABASE_URL: postgres://shop:${DEMO_SHOP_DB_PASSWORD:-local-only-demo-shop-db-password}@demo-shop-db:5432/shop
     ports:
       - "127.0.0.1:${DEMO_SHOP_PORT:-3100}:3000"
     networks:
       - public
+      - shop
     depends_on:
       gateway:
+        condition: service_healthy
+      demo-shop-db:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/healthz"]
@@ -563,6 +576,37 @@ services:
       timeout: 3s
       retries: 3
       start_period: 20s
+      start_interval: 1s
+    restart: unless-stopped
+
+  # LOCAL DEVELOPMENT AND CI ONLY: the demo shop's own database. A dev app
+  # keeps its data (here: orders) in its own database; secure-cloud is only
+  # the middleman and never sees it. Only the demo shop is on its network,
+  # and no port is published to the host. Never in deploy/.
+  demo-shop-db:
+    image: postgres:18.6-alpine
+    user: "70:70"
+    environment:
+      POSTGRES_DB: shop
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: ${DEMO_SHOP_DB_PASSWORD:-local-only-demo-shop-db-password}
+    networks:
+      - shop
+    volumes:
+      - demo-shop-data:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "pg_isready",
+          "--host=127.0.0.1",
+          "--username=shop",
+          "--dbname=shop",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
       start_interval: 1s
     restart: unless-stopped
 
@@ -658,7 +702,12 @@ networks:
   public:
   internal:
     internal: true
+  # The demo shop and its database only. A fixed name, so the demo shop
+  # started for the live server (scripts/demo-shop-live.ts) can join it.
+  shop:
+    name: demo-shop
 
 volumes:
   storage-data:
   postgres-data:
+  demo-shop-data:

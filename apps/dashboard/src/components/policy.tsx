@@ -7,7 +7,7 @@ import { Field } from "./ui";
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] as const;
 type Method = (typeof METHODS)[number];
 const PATH = /^(\/([A-Za-z0-9._~-]+|\*))+$|^\/$/;
-const FIELD = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+const FIELD = /^[A-Za-z_][A-Za-z0-9_]{0,63}(\[[A-Za-z0-9_]{1,64}\]){0,5}$/;
 
 export interface PolicyForm {
   routes: string;
@@ -197,7 +197,7 @@ export function PolicyFields({
         value={form.field}
         onChange={set("field")}
         error={errors.field}
-        hint="A whole number in the JSON body of POST, PUT and PATCH calls, like amount in cents."
+        hint="A whole number in the JSON or form body of POST, PUT and PATCH calls, like amount in cents (Stripe uses amount)."
       />
       <div className="policy-row">
         <Field

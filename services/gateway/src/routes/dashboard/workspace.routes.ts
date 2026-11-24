@@ -12,6 +12,7 @@ import { analyticsController } from "../../controllers/dashboard/analytics.contr
 import { apiKeysController } from "../../controllers/dashboard/api-keys.controller.js";
 import { auditController } from "../../controllers/dashboard/audit.controller.js";
 import { connectionsController } from "../../controllers/dashboard/connections.controller.js";
+import { dashboardWebhooksController } from "../../controllers/dashboard/webhooks.controller.js";
 import { filesController } from "../../controllers/dashboard/files.controller.js";
 import { secretsController } from "../../controllers/dashboard/secrets.controller.js";
 import { workspaceDeletionController } from "../../controllers/dashboard/workspace-deletion.controller.js";
@@ -117,6 +118,7 @@ export const workspaceRoutes: FastifyPluginCallback<DashboardOptions> = (
     const keys = apiKeysController(options);
     const secret = secretsController(secrets);
     const connections = connectionsController(options);
+    const webhooks = dashboardWebhooksController(options);
     const audit = auditController(
       auditService,
       options.auditToken,
@@ -203,6 +205,37 @@ export const workspaceRoutes: FastifyPluginCallback<DashboardOptions> = (
       "/proxy-connections/:name",
       { schema: schemas.deleteConnectionDashboardSchema, config: owner },
       connections.remove,
+    );
+
+    api.get(
+      "/webhooks",
+      { schema: schemas.listWebhookEndpointsSchema },
+      webhooks.list,
+    );
+    api.post(
+      "/webhooks",
+      { schema: schemas.createWebhookEndpointSchema, config: owner },
+      webhooks.create,
+    );
+    api.patch(
+      "/webhooks/:endpointId",
+      { schema: schemas.updateWebhookEndpointSchema, config: owner },
+      webhooks.update,
+    );
+    api.delete(
+      "/webhooks/:endpointId",
+      { schema: schemas.deleteWebhookEndpointSchema, config: owner },
+      webhooks.remove,
+    );
+    api.get(
+      "/webhooks/:endpointId/events",
+      { schema: schemas.listWebhookEndpointEventsSchema },
+      webhooks.events,
+    );
+    api.post(
+      "/webhooks/:endpointId/events/:eventId/redeliver",
+      { schema: schemas.redeliverWebhookEventSchema, config: owner },
+      webhooks.redeliver,
     );
 
     api.get(

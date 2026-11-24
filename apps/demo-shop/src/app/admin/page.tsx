@@ -1,6 +1,6 @@
 import { ErrorBanner, PageHeader, Status } from "@/components/ui";
 import { describeError } from "@/lib/messages";
-import { PAYMENTS_CONNECTION } from "@/lib/payments";
+import { STRIPE_CONNECTION } from "@/lib/payments";
 import {
   isConnected,
   listConnections,
@@ -31,7 +31,7 @@ export default async function AdminPage() {
   } catch (error) {
     problem = describeError(error);
   }
-  const payments = connections.find((c) => c.name === PAYMENTS_CONNECTION);
+  const payments = connections.find((c) => c.name === STRIPE_CONNECTION);
   const paymentKey = secrets.find((s) => s.name === payments?.secretName);
 
   return (
@@ -61,7 +61,7 @@ export default async function AdminPage() {
           </p>
           <p className="muted">
             {usage
-              ? `of ${formatBytes(usage.limitBytes)}: photos and receipts`
+              ? `of ${formatBytes(usage.limitBytes)}: product photos`
               : "Unknown"}
           </p>
         </section>
@@ -71,12 +71,12 @@ export default async function AdminPage() {
             {paymentKey ? `Secret v${paymentKey.latestVersion}` : "Missing"}
           </Status>
           <p className="muted">
-            Write-only: the shop can never read it. The platform adds it to each
-            payment.
+            Your Stripe test key, write-only: the shop can never read it. The
+            platform adds it to each payment.
           </p>
         </section>
-        <section className="card stack-2" aria-label="Payments connection">
-          <p className="sec-label">Payments Connection</p>
+        <section className="card stack-2" aria-label="Stripe connection">
+          <p className="sec-label">Stripe Connection</p>
           <Status ok={payments !== undefined}>
             {payments ? "Ready" : "Missing"}
           </Status>
@@ -87,7 +87,7 @@ export default async function AdminPage() {
                 <code>{payments.secretName}</code>
               </>
             ) : (
-              "Run pnpm demo:setup."
+              "Run pnpm demo:setup with STRIPE_SECRET_KEY set."
             )}
           </p>
         </section>

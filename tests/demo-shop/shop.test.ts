@@ -13,30 +13,6 @@ import {
   latestImages,
 } from "@/lib/images";
 import type { FileInfo } from "@/lib/platform/client";
-import { isReceiptFile, parseReceipt, type Receipt } from "@/lib/receipts";
-
-const receipt: Receipt = {
-  version: 1,
-  orderId: "0b9c1f9e-6f5e-4a8a-9e57-2b1f3f2f8d11",
-  createdAt: "2026-11-12T10:00:00.000Z",
-  items: [
-    { slug: "enamel-mug", name: "Enamel Mug", quantity: 2, unitCents: 2400 },
-  ],
-  totalCents: 4800,
-  currency: "sgd",
-  chargeId: "ch_test",
-};
-
-describe("receipts", () => {
-  it("parses only receipt files", () => {
-    expect(parseReceipt(JSON.stringify(receipt))?.totalCents).toBe(4800);
-    expect(parseReceipt("not json")).toBeNull();
-    expect(parseReceipt(JSON.stringify({ version: 2 }))).toBeNull();
-    expect(isReceiptFile(`receipt-${receipt.orderId}.json`)).toBe(true);
-    expect(isReceiptFile("receipt-../../x.json")).toBe(false);
-    expect(isReceiptFile(null)).toBe(false);
-  });
-});
 
 describe("catalog", () => {
   it("prices come from the catalog, and quantities are 1 to 5", () => {

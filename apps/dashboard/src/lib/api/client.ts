@@ -231,6 +231,13 @@ export type PoolUser = PoolUserList["users"][number];
 export type PoolRoleList = Json<`${W}/user-pools/{poolId}/roles`, "get", 200>;
 export type PoolRole = PoolRoleList["roles"][number];
 export type FlagList = Json<`${W}/flags`, "get", 200>;
+export type WebhookEndpointList = Json<`${W}/webhooks`, "get", 200>;
+export type WebhookEndpoint = WebhookEndpointList["endpoints"][number];
+export type WebhookEventList = Json<
+  `${W}/webhooks/{endpointId}/events`,
+  "get",
+  200
+>;
 export type Flag = FlagList["flags"][number];
 export type FlagEnvironmentName = keyof Flag["environments"];
 export type FlagSettings = Flag["environments"]["production"];

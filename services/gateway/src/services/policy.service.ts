@@ -33,7 +33,7 @@ export const DENIAL_MESSAGES: Record<DenialReason, string> = {
   route_not_allowed:
     "The connection's policy doesn't allow this method and path",
   amount_missing:
-    "The connection's policy needs a whole, positive amount in the JSON body",
+    "The connection's policy needs a whole, positive amount in the JSON or form body",
   amount_too_high: "The amount is over the connection's per-call limit",
   daily_limit_reached: "The amount would go over the connection's daily limit",
 };
@@ -78,7 +78,24 @@ export function routeAllowed(
   });
 }
 
-export function amountFrom(body: Buffer, field: string): number | undefined {
+const positiveWhole = (value: unknown): number | undefined =>
+  typeof value === "number" && Number.isSafeInteger(value) && value > 0
+    ? value
+    : undefined;
+
+export function amountFrom(
+  body: Buffer,
+  field: string,
+  contentType = "application/json",
+): number | undefined {
+  const type = contentType.split(";")[0]!.trim().toLowerCase();
+  if (type === "application/x-www-form-urlencoded") {
+    const values = new URLSearchParams(body.toString("utf8")).getAll(field);
+    return values.length === 1 && /^[1-9][0-9]{0,15}$/.test(values[0]!)
+      ? positiveWhole(Number(values[0]))
+      : undefined;
+  }
+  if (type !== "application/json") return undefined;
   let parsed: unknown;
   try {
     parsed = JSON.parse(body.toString("utf8"));
@@ -88,10 +105,7 @@ export function amountFrom(body: Buffer, field: string): number | undefined {
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     return undefined;
   }
-  const value = (parsed as Record<string, unknown>)[field];
-  return typeof value === "number" && Number.isSafeInteger(value) && value > 0
-    ? value
-    : undefined;
+  return positiveWhole((parsed as Record<string, unknown>)[field]);
 }
 
 export function utcDay(now = new Date()): { day: string; endsAtMs: number } {

@@ -18,10 +18,12 @@ export default function QuickstartPage() {
       </header>
 
       <p>
-        The SDK gives your server three things: calling outside APIs (like a
+        The SDK gives your server six things: calling outside APIs (like a
         payment provider) without ever holding their keys, storing files
-        encrypted, and signing your own users in. It runs on your{" "}
-        <strong>server only</strong>, because it uses your app&apos;s API key.
+        encrypted, signing your own users in, checking their roles and
+        permissions, feature flags, and trusted payment webhooks. It runs on
+        your <strong>server only</strong>, because it uses your app&apos;s API
+        key.
       </p>
 
       <h2 className="heading-5">1. Create an API key</h2>

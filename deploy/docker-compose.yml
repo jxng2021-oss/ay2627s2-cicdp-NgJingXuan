@@ -59,6 +59,8 @@ services:
       # Continue with Google or GitHub (docs/decisions/0038): each is off
       # until both its values are in /etc/secure-cloud-platform/secrets.env.
       GATEWAY_PUBLIC_ORIGIN: ${DASHBOARD_API_ORIGIN:?DASHBOARD_API_ORIGIN must be set}
+      # Webhooks (docs/decisions/0040): generated once by deploy.sh.
+      WEBHOOK_SIGNING_KEY: ${WEBHOOK_SIGNING_KEY:?WEBHOOK_SIGNING_KEY must be set}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}

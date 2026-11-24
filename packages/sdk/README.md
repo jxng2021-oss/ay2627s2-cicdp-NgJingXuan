@@ -9,6 +9,10 @@ uses your app's API key, which must never reach a browser.
   `cloud.files.send(res, id)`
 - **Sign your users in**: `users.signIn({ email, password })`,
   `users.requireUser()`
+- **Feature flags**: `cloud.flags("production").isOn("new-checkout", { id, email })`
+- **Payment webhooks** signed by secure-cloud:
+  `cloud.webhooks.verify(rawBody, req.headers["x-securecloud-signature"])`,
+  or `cloud.webhooks.events({ after })` to pull them
 - **Express helpers**: `errorHandler()`, `requireUser()`, `files.send()`
 
 ```js

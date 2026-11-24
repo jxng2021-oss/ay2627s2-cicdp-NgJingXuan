@@ -15,6 +15,7 @@ import {
   Loading,
   PageHeader,
   Pager,
+  CopyButton,
   ShortValue,
   formatDate,
 } from "@/components/ui";
@@ -25,6 +26,19 @@ import { workspace as api } from "@/lib/api/endpoints";
 import { useToast } from "@/lib/toast";
 import { useLoad } from "@/lib/use-load";
 import { useWorkspace } from "@/lib/workspace";
+
+const sdkExample = (
+  poolId: string,
+) => `const { SecureCloud } = require("@secure-cloud/sdk");
+
+const users = new SecureCloud().userPool("${poolId}");
+
+const session = await users.signIn({ email, password });
+// session.accessToken goes to the browser in a cookie
+
+app.get("/account", users.requireUser({ cookie: "access_token" }), (req, res) => {
+  res.json({ email: req.user.email });
+});`;
 
 export default function UserPoolPage() {
   const { poolId } = useParams<{ poolId: string }>();
@@ -100,9 +114,11 @@ export default function UserPoolPage() {
         <div className="section">
           <h2>Connect your app</h2>
           <p className="muted">
-            Your server calls the API with an API key to sign users up and in.
-            Check access tokens with any JWT library, using the public keys
-            (ES256): no API key needed for those.
+            Your server signs users up and in with the SDK and an API key, and
+            checks their access tokens on its own (ES256, with the pool&apos;s
+            public keys). Any other language can call the API and use a JWT
+            library. More in the{" "}
+            <Link href="/docs/user-pools">user sign in docs</Link>.
           </p>
           <dl className="details">
             {details.map(([label, value, copyName]) => (
@@ -114,12 +130,12 @@ export default function UserPoolPage() {
               </div>
             ))}
           </dl>
+          <div className="row row-between">
+            <p className="sec-label">With the SDK</p>
+            <CopyButton value={sdkExample(info.id)} label="Copy the code" />
+          </div>
           <pre className="code-block">
-            <code>{`POST /v1/user-pools/${info.id}/sessions
-Authorization: Bearer <your API key>
-{"email": "ada@example.com", "password": "..."}
-
-→ { "accessToken": "<ES256 JWT>", "refreshToken": "...", "expiresIn": ${info.accessTokenTtlSeconds} }`}</code>
+            <code>{sdkExample(info.id)}</code>
           </pre>
         </div>
       </Card>

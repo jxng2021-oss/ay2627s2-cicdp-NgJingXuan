@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from "node:crypto";
 import { buildApp } from "./app.js";
 import { AuditClient } from "./audit.js";
 import type { Database } from "./db/client.js";
@@ -7,6 +8,8 @@ const document = process.argv[2] === "dashboard" ? "dashboard" : "public";
 
 const app = buildApp({
   openApiDocument: document,
+  webhookSigningKey: generateKeyPairSync("ec", { namedCurve: "P-256" })
+    .privateKey,
   dashboard: {
     origin: "https://dashboard.invalid",
     session: {

@@ -157,6 +157,21 @@ export const ACTIONS = {
     chain: "tenant",
     sentBy: "gateway",
   },
+  "webhook_endpoint.created": {
+    resourceType: "webhook_endpoint",
+    chain: "tenant",
+    sentBy: "gateway",
+  },
+  "webhook_endpoint.updated": {
+    resourceType: "webhook_endpoint",
+    chain: "tenant",
+    sentBy: "gateway",
+  },
+  "webhook_endpoint.deleted": {
+    resourceType: "webhook_endpoint",
+    chain: "tenant",
+    sentBy: "gateway",
+  },
   "user.oauth_linked": {
     resourceType: "user",
     chain: "platform",

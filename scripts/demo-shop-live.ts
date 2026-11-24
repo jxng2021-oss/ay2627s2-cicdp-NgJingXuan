@@ -37,6 +37,8 @@ function writeTemplate(): void {
       `PLATFORM_API_URL=${DEFAULT_LIVE_API}`,
       "PLATFORM_API_KEY=",
       "PLATFORM_POOL_ID=",
+      "# Optional: the Stripe webhook endpoint's ID (dashboard, Webhooks).",
+      "PLATFORM_WEBHOOK_ENDPOINT_ID=",
       `SHOP_ADMIN_PASSWORD=${randomBytes(18).toString("base64url")}`,
       "",
     ].join("\n"),
@@ -155,19 +157,19 @@ async function checkPlatform(
   }
   console.log("✔ The user pool exists (shop sign up and sign in).");
 
-  const secret = await call(url, key, "GET", "/v1/secrets/payment-api-key");
+  const secret = await call(url, key, "GET", "/v1/secrets/stripe-secret-key");
   if (secret.status === 503) {
     fail("The live secrets service is sealed: unseal it on the server first.");
   }
   const list = field(connections.data, "connections");
-  const hasPayments =
+  const hasStripe =
     Array.isArray(list) &&
-    list.some((connection) => field(connection, "name") === "payments");
-  if (secret.status === 200 && hasPayments) {
-    console.log("✔ The payment-api-key secret and payments connection exist.");
+    list.some((connection) => field(connection, "name") === "stripe");
+  if (secret.status === 200 && hasStripe) {
+    console.log("✔ The stripe-secret-key secret and stripe connection exist.");
   } else {
     console.log(
-      "! No payment-api-key secret or payments connection yet: checkout will fail until you add them (docs/demo-shop-targets.md, step 4).",
+      "! No stripe-secret-key secret or stripe connection yet: checkout will fail until you add them (docs/demo-shop-targets.md, Live).",
     );
   }
 
@@ -226,6 +228,10 @@ export async function startLive(): Promise<void> {
   const key = required(settings, "PLATFORM_API_KEY");
   const poolId = required(settings, "PLATFORM_POOL_ID");
   if (!UUID.test(poolId)) fail("PLATFORM_POOL_ID must be the pool's ID.");
+  const endpointId = settings.get("PLATFORM_WEBHOOK_ENDPOINT_ID");
+  if (endpointId && !UUID.test(endpointId)) {
+    fail("PLATFORM_WEBHOOK_ENDPOINT_ID must be the webhook endpoint's ID.");
+  }
   if (required(settings, "SHOP_ADMIN_PASSWORD").length < 12) {
     fail("SHOP_ADMIN_PASSWORD must be at least 12 characters.");
   }
@@ -238,6 +244,13 @@ export async function startLive(): Promise<void> {
     fail("Couldn't build the demo shop image.");
   }
   stopLive();
+  if (
+    docker(["compose", "up", "--detach", "--wait", "demo-shop-db"]).status !== 0
+  ) {
+    fail("Couldn't start the demo shop's own database.");
+  }
+  const dbPassword =
+    process.env.DEMO_SHOP_DB_PASSWORD ?? "local-only-demo-shop-db-password";
   const run = docker([
     "run",
     "--detach",
@@ -254,6 +267,14 @@ export async function startLive(): Promise<void> {
     ENV_FILE,
     "--env",
     `PLATFORM_API_URL=${url}`,
+    "--env",
+    `SHOP_URL=${SHOP_URL}`,
+    "--env",
+    "PLATFORM_WEBHOOK_MODE=pull",
+    "--env",
+    `SHOP_DATABASE_URL=postgres://shop:${dbPassword}@demo-shop-db:5432/shop`,
+    "--network",
+    "demo-shop",
     "--publish",
     `127.0.0.1:${PORT}:3000`,
     IMAGE,

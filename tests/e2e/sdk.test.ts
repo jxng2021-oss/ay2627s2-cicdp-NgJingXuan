@@ -52,6 +52,40 @@ async function ownerWorkspace() {
   const key = await call("POST", `/workspaces/${workspace}/api-keys`, {
     name: "express-app",
   });
+  expect(
+    (
+      await call("POST", `/workspaces/${workspace}/flags`, {
+        key: "new-checkout",
+        description: "Only chosen users",
+        kind: "boolean",
+        offValue: false,
+      })
+    ).status,
+  ).toBe(201);
+  expect(
+    (
+      await call(
+        "PUT",
+        `/workspaces/${workspace}/flags/new-checkout/environments/production`,
+        {
+          enabled: true,
+          rules: [
+            {
+              conditions: [
+                {
+                  attribute: "email",
+                  operator: "in",
+                  values: ["chosen@example.test"],
+                },
+              ],
+              value: true,
+            },
+          ],
+          defaultValue: false,
+        },
+      )
+    ).status,
+  ).toBe(200);
   return {
     poolId: ((await pool.json()) as { id: string }).id,
     apiKey: ((await key.json()) as { key: string }).key,
@@ -212,5 +246,27 @@ describe("the SDK on the running stack", () => {
     );
     await users.deleteRole("support");
     expect((await users.getUser(user.id)).roles).toEqual([]);
+  });
+});
+
+describe("feature flags through the SDK", () => {
+  it("a chosen user sees the feature, everyone else doesn't, and other environments are off", async () => {
+    const flags = cloud.flags("production");
+
+    expect(
+      await flags.isOn("new-checkout", {
+        id: "user-1",
+        email: "chosen@example.test",
+      }),
+    ).toBe(true);
+    expect(
+      await flags.isOn("new-checkout", {
+        id: "user-2",
+        email: "someone@example.test",
+      }),
+    ).toBe(false);
+    expect(
+      await cloud.flags("staging").evaluate({ id: "user-1" }, ["new-checkout"]),
+    ).toEqual({ "new-checkout": { value: false, reason: "off" } });
   });
 });

@@ -15,6 +15,8 @@ import type { StorageProxyOptions } from "../services/storage.service.js";
 import { storageProxy } from "./storage.routes.js";
 import { flagRoutes } from "./flags.routes.js";
 import { userPoolRoutes } from "./user-pools.routes.js";
+import { webhookEventsRoute } from "./webhooks.routes.js";
+import type { WebhooksControllerOptions } from "../controllers/webhooks.controller.js";
 
 export type PublicApiOptions = ApiKeyAuthOptions &
   StorageProxyOptions &
@@ -27,6 +29,7 @@ export type PublicApiOptions = ApiKeyAuthOptions &
     identityUrl: string;
     flagsUrl: string;
     rateLimitStore: RateLimitStore;
+    webhooks: WebhooksControllerOptions;
   };
 
 export const publicApiV1: FastifyPluginCallback<PublicApiOptions> = (
@@ -71,6 +74,7 @@ export const publicApiV1: FastifyPluginCallback<PublicApiOptions> = (
     identityUrl: options.identityUrl,
   });
   app.register(flagRoutes, { ...upstream, flagsUrl: options.flagsUrl });
+  app.register(webhookEventsRoute, options.webhooks);
   app.register(auditEventsRoute, {
     ...upstream,
     auditUrl: options.auditUrl,

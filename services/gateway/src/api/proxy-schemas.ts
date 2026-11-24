@@ -124,9 +124,10 @@ export const ConnectionPolicy = Type.Object(
       Type.Object(
         {
           field: Type.String({
-            pattern: "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+            pattern:
+              "^[A-Za-z_][A-Za-z0-9_]{0,63}(\\[[A-Za-z0-9_]{1,64}\\]){0,5}$",
             description:
-              "A top-level field of the JSON request body holding a whole, positive amount, e.g. `amount` (in the smallest unit, like cents).",
+              "The field holding a whole, positive amount (in the smallest unit, like cents): a top-level field of a JSON body, e.g. `amount`, or a field of a form body, which may use brackets, e.g. `line_items[0][price_data][unit_amount]` (Stripe Checkout).",
             example: "amount",
           }),
           maxPerRequest: Type.Integer({ minimum: 1, maximum: 1e12 }),

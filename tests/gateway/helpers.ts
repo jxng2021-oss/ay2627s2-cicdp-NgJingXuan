@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from "node:crypto";
 import { createServer, type RequestListener, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Writable } from "node:stream";
@@ -114,6 +115,10 @@ export const TEST_OAUTH: OAuthSettings = {
   github: { clientId: "github-client-id", clientSecret: "github-secret" },
 };
 
+export const WEBHOOK_KEY = generateKeyPairSync("ec", {
+  namedCurve: "P-256",
+}).privateKey;
+
 export const AUDIT_TOKEN = "test-audit-token-gateway-0123456789abcdef";
 export const SESSION_SECRET = "test-session-secret-0123456789abcdef0123";
 export const DASHBOARD_ORIGIN = "https://dashboard.test";
@@ -146,6 +151,7 @@ export async function startGateway(
       oauth: TEST_OAUTH,
     },
     rateLimitStore: new MemoryRateLimitStore(),
+    webhookSigningKey: WEBHOOK_KEY,
     adminToken: ADMIN_TOKEN,
     apiKeyHashSecret: API_KEY_HASH_SECRET,
     apiKeyPrefix: "sk_test_",

@@ -136,6 +136,11 @@ app.post("/checkout", async (req, res) => {
             "The vault is sealed (for example after a restart) until it is unsealed.",
           ],
           ["UPSTREAM_UNAVAILABLE", "502", "The provider couldn't be reached."],
+          [
+            "INVALID_ROUTE",
+            "0",
+            'The route isn\'t a method and a path like "POST /charges", or it could leave the connection. Nothing was sent.',
+          ],
         ]}
       />
       <Code title="server.js">{`
