@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
 import {
   ArrowLink,
   Banner,
   Button,
+  Card,
   Dialog,
   EmptyState,
   ErrorState,
@@ -16,7 +18,7 @@ import {
   Status,
   formatDate,
 } from "@/components/ui";
-import { ApiError } from "@/lib/api/client";
+import { ApiError, type Flag, type FlagSettings } from "@/lib/api/client";
 import { workspace as api } from "@/lib/api/endpoints";
 import { useToast } from "@/lib/toast";
 import { useLoad } from "@/lib/use-load";
@@ -25,9 +27,59 @@ import { useWorkspace } from "@/lib/workspace";
 const KEY_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 const ENVIRONMENTS = ["development", "staging", "production"] as const;
 
+const title = (environment: string) =>
+  environment[0]!.toUpperCase() + environment.slice(1);
+
+function environmentStatus(flag: Flag, settings: FlagSettings) {
+  if (!settings.enabled) return <Status>Off</Status>;
+  const targeted = settings.rules.length > 0 || settings.rollout;
+  if (targeted) return <Status tone="info">On for some</Status>;
+  if (flag.kind === "boolean" && settings.defaultValue === false) {
+    return <Status tone="warning">On, nobody gets true</Status>;
+  }
+  return <Status tone="success">On for everyone</Status>;
+}
+
+function Guide() {
+  const steps = [
+    [
+      "Create a flag",
+      "Give it a name your code will use, like new-checkout. It starts off everywhere.",
+    ],
+    [
+      "Ask for it in your app",
+      "Your server asks the platform for the flag's value for each user, and shows the feature only when it's on.",
+    ],
+    [
+      "Choose who gets it",
+      "Turn it on per environment, for everyone or only for users you pick from your user pools. Changes apply right away.",
+    ],
+  ] as const;
+  return (
+    <Card title="How feature flags work">
+      <ol className="flag-guide">
+        {steps.map(([heading, text], index) => (
+          <li key={heading}>
+            <span className="flag-step-number" aria-hidden="true">
+              {index + 1}
+            </span>
+            <div>
+              <p>
+                <strong>{heading}</strong>
+              </p>
+              <p className="muted body-6">{text}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </Card>
+  );
+}
+
 export default function FlagsPage() {
   const { id, isOwner } = useWorkspace();
   const toast = useToast();
+  const router = useRouter();
   const flags = useLoad(() => api.flags(id), [id]);
   const [creating, setCreating] = useState(false);
   const [key, setKey] = useState("");
@@ -37,7 +89,6 @@ export default function FlagsPage() {
   const [keyError, setKeyError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>();
-  const kindId = useId();
 
   function close() {
     setCreating(false);
@@ -64,17 +115,13 @@ export default function FlagsPage() {
         offValue: kind === "boolean" ? false : offText,
       });
       toast(`Flag ${key} created, off everywhere`);
-      setKey("");
-      setDescription("");
-      close();
-      flags.reload();
+      router.push(`/workspaces/${id}/flags/${key}`);
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
-        setKeyError("A flag with this key already exists.");
+        setKeyError("A flag with this name already exists.");
       } else {
         setFailure(error);
       }
-    } finally {
       setBusy(false);
     }
   }
@@ -84,7 +131,7 @@ export default function FlagsPage() {
       <PageHeader
         label="App services"
         title="Feature flags"
-        description="Turn features on per environment, for chosen users or a share of them. Apps ask for the values through the API."
+        description="Ship a feature switched off, then turn it on from here, for everyone or only some users, without redeploying."
         actions={
           isOwner && (
             <Button variant="primary" onClick={() => setCreating(true)}>
@@ -95,9 +142,12 @@ export default function FlagsPage() {
       />
       {!isOwner && (
         <Banner title="Viewing as a member">
-          Only workspace owners can create or change flags. You can test them.
+          Only workspace owners can create or change flags. You can check what
+          users get.
         </Banner>
       )}
+
+      <Guide />
 
       {flags.status === "loading" && <Loading />}
       {flags.status === "error" && (
@@ -116,23 +166,23 @@ export default function FlagsPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th scope="col">Key</th>
-                  <th scope="col">Kind</th>
+                  <th scope="col">Flag</th>
+                  <th scope="col">Type</th>
                   {ENVIRONMENTS.map((environment) => (
                     <th scope="col" key={environment}>
-                      {environment[0]!.toUpperCase() + environment.slice(1)}
+                      {title(environment)}
                     </th>
                   ))}
                   <th scope="col">Changed</th>
                   <th scope="col">
-                    <span className="sr-only">Details</span>
+                    <span className="sr-only">Open</span>
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {flags.data.flags.map((flag) => (
                   <tr key={flag.key}>
-                    <td data-label="Key">
+                    <td data-label="Flag">
                       <Link href={`/workspaces/${id}/flags/${flag.key}`}>
                         <code>{flag.key}</code>
                       </Link>
@@ -140,15 +190,14 @@ export default function FlagsPage() {
                         <p className="muted">{flag.description}</p>
                       )}
                     </td>
-                    <td data-label="Kind">
-                      {flag.kind === "boolean" ? "On/off" : "Text"}
+                    <td data-label="Type">
+                      {flag.kind === "boolean" ? "Switch" : "Text"}
                     </td>
                     {ENVIRONMENTS.map((environment) => (
-                      <td data-label={environment} key={environment}>
-                        {flag.environments[environment].enabled ? (
-                          <Status tone="success">On</Status>
-                        ) : (
-                          <Status>Off</Status>
+                      <td data-label={title(environment)} key={environment}>
+                        {environmentStatus(
+                          flag,
+                          flag.environments[environment],
                         )}
                       </td>
                     ))}
@@ -173,10 +222,10 @@ export default function FlagsPage() {
           noValidate
         >
           <Field
-            label="Key"
+            label="Name"
             value={key}
             onChange={(e) => setKey(e.target.value)}
-            hint="What your app asks for, like new-checkout. Can't be changed later."
+            hint="What your code asks for, like new-checkout. Can't be changed later."
             error={keyError}
             maxLength={64}
             autoFocus
@@ -185,33 +234,53 @@ export default function FlagsPage() {
             label="Description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            hint="Optional: what the flag controls."
+            hint="Optional: what it controls, so your team knows."
             maxLength={500}
           />
-          <div className="field">
-            <label htmlFor={kindId}>Kind</label>
-            <select
-              id={kindId}
-              className="select"
-              value={kind}
-              onChange={(e) => setKind(e.target.value as "boolean" | "string")}
-            >
-              <option value="boolean">On/off (true or false)</option>
-              <option value="string">Text (e.g. a variant name)</option>
-            </select>
-          </div>
+          <fieldset className="flag-kinds">
+            <legend className="sec-label">Type</legend>
+            <label className="flag-kind">
+              <input
+                type="radio"
+                name="kind"
+                checked={kind === "boolean"}
+                onChange={() => setKind("boolean")}
+              />
+              <span>
+                <strong>On/off switch</strong>
+                <span className="muted body-6">
+                  Your app gets true or false. Most flags are this.
+                </span>
+              </span>
+            </label>
+            <label className="flag-kind">
+              <input
+                type="radio"
+                name="kind"
+                checked={kind === "string"}
+                onChange={() => setKind("string")}
+              />
+              <span>
+                <strong>Text</strong>
+                <span className="muted body-6">
+                  Your app gets a word you choose, like a variant name.
+                </span>
+              </span>
+            </label>
+          </fieldset>
           {kind === "string" && (
             <Field
               label="Value while off"
               value={offText}
               onChange={(e) => setOffText(e.target.value)}
-              hint="What apps get while the flag is off, e.g. control."
+              hint="What apps get while the flag is off, like control."
               maxLength={200}
             />
           )}
           <p className="muted">
-            New flags start off in every environment
-            {kind === "boolean" ? ", serving false" : ""}.
+            It starts off in every environment, so nothing changes for users
+            {kind === "boolean" ? " (everyone gets false)" : ""} until you turn
+            it on.
           </p>
           <FormError error={failure} />
           <div className="form-actions">

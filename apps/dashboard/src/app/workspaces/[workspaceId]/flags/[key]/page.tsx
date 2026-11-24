@@ -8,6 +8,7 @@ import {
   Button,
   Card,
   ConfirmDialog,
+  CopyButton,
   EmptyState,
   ErrorState,
   Field,
@@ -17,6 +18,11 @@ import {
   Status,
 } from "@/components/ui";
 import {
+  UserPicker,
+  type PickBy,
+  type PickedUser,
+} from "@/components/user-picker";
+import {
   ApiError,
   type Flag,
   type FlagEnvironmentName,
@@ -24,43 +30,166 @@ import {
   type FlagSettings,
 } from "@/lib/api/client";
 import { workspace as api } from "@/lib/api/endpoints";
+import { apiUrl } from "@/lib/api/origin";
 import { useToast } from "@/lib/toast";
 import { useLoad } from "@/lib/use-load";
 import { useWorkspace } from "@/lib/workspace";
 
 const ENVIRONMENTS = ["development", "staging", "production"] as const;
-const OPERATORS = [
-  ["equals", "equals"],
-  ["not_equals", "doesn't equal"],
-  ["in", "is one of"],
-  ["not_in", "is none of"],
-  ["contains", "contains"],
-  ["starts_with", "starts with"],
-  ["greater_than", "is greater than"],
-  ["less_than", "is less than"],
-] as const;
-type Operator = (typeof OPERATORS)[number][0];
+const MAX_PER_RULE = 50;
 type Value = boolean | string;
 
-interface RuleDraft {
-  conditions: { attribute: string; operator: Operator; values: string }[];
-  value: Value;
-  percentage: string;
+interface Target {
+  by: PickBy;
+  value: string;
+  email: string | undefined;
+  gets: Value;
+}
+interface Draft {
+  enabled: boolean;
+  targets: Target[];
+  share: string;
+  defaultValue: Value;
 }
 
 const title = (environment: string) =>
   environment[0]!.toUpperCase() + environment.slice(1);
 
-function toDrafts(settings: FlagSettings): RuleDraft[] {
-  return settings.rules.map((rule) => ({
-    conditions: rule.conditions.map((condition) => ({
-      attribute: condition.attribute,
-      operator: condition.operator,
-      values: condition.values.join(", "),
-    })),
-    value: rule.value,
-    percentage: rule.percentage === undefined ? "" : String(rule.percentage),
-  }));
+function describeValue(kind: Flag["kind"], value: Value): string {
+  if (kind === "boolean") return value === true ? "can see it" : "can't see it";
+  return `get "${String(value)}"`;
+}
+
+function isTargetRule(rule: FlagSettings["rules"][number]): boolean {
+  const [condition] = rule.conditions;
+  return (
+    rule.conditions.length === 1 &&
+    (condition!.attribute === "key" || condition!.attribute === "email") &&
+    (condition!.operator === "in" || condition!.operator === "equals")
+  );
+}
+
+function toDraft(settings: FlagSettings): Draft {
+  const targets: Target[] = [];
+  let share = "";
+  for (const rule of settings.rules.filter(isTargetRule)) {
+    const condition = rule.conditions[0]!;
+    for (const value of condition.values) {
+      targets.push({
+        by: condition.attribute === "key" ? "id" : "email",
+        value,
+        email: condition.attribute === "email" ? value : undefined,
+        gets: rule.value,
+      });
+    }
+    if (rule.percentage !== undefined && share === "") {
+      share = String(rule.percentage);
+    }
+  }
+  return {
+    enabled: settings.enabled,
+    targets,
+    share,
+    defaultValue: settings.defaultValue,
+  };
+}
+
+function hasOlderSettings(settings: FlagSettings): boolean {
+  return settings.rollout !== undefined || !settings.rules.every(isTargetRule);
+}
+
+function shareOf(text: string): number | undefined | null {
+  if (text.trim() === "") return undefined;
+  const value = Number(text);
+  return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
+}
+
+function grants(kind: Flag["kind"], gets: Value, offValue: Value): boolean {
+  return kind === "boolean" ? gets === true : gets !== offValue;
+}
+
+function toRules(
+  flag: Flag,
+  draft: Draft,
+  share: number | undefined,
+): FlagSettings["rules"] {
+  const groups = new Map<
+    string,
+    { by: PickBy; gets: Value; values: string[] }
+  >();
+  const ordered = [...draft.targets].sort(
+    (a, b) =>
+      Number(grants(flag.kind, a.gets, flag.offValue)) -
+      Number(grants(flag.kind, b.gets, flag.offValue)),
+  );
+  for (const target of ordered) {
+    const name = `${target.by}:${JSON.stringify(target.gets)}`;
+    const group = groups.get(name) ?? {
+      by: target.by,
+      gets: target.gets,
+      values: [],
+    };
+    group.values.push(target.value);
+    groups.set(name, group);
+  }
+  const rules: FlagSettings["rules"] = [];
+  for (const group of groups.values()) {
+    const partial =
+      share !== undefined &&
+      share < 100 &&
+      grants(flag.kind, group.gets, flag.offValue);
+    for (let start = 0; start < group.values.length; start += MAX_PER_RULE) {
+      rules.push({
+        conditions: [
+          {
+            attribute: group.by === "id" ? "key" : "email",
+            operator: "in",
+            values: group.values.slice(start, start + MAX_PER_RULE),
+          },
+        ],
+        value: group.gets,
+        ...(partial ? { percentage: share } : {}),
+      });
+    }
+  }
+  return rules;
+}
+
+function summary(flag: Flag, environment: string, draft: Draft): string[] {
+  if (!draft.enabled) {
+    return [
+      `${title(environment)} is off: every user ${describeValue(flag.kind, flag.offValue)}.`,
+    ];
+  }
+  const lines: string[] = [];
+  const share = shareOf(draft.share);
+  const byGets = new Map<string, Target[]>();
+  for (const target of draft.targets) {
+    const name = JSON.stringify(target.gets);
+    byGets.set(name, [...(byGets.get(name) ?? []), target]);
+  }
+  for (const targets of byGets.values()) {
+    const gets = targets[0]!.gets;
+    const names = targets.map((t) => t.email ?? t.value);
+    const who =
+      names.length <= 3
+        ? names.join(", ")
+        : `${names.slice(0, 3).join(", ")} and ${names.length - 3} more`;
+    const partial =
+      share !== undefined &&
+      share !== null &&
+      share < 100 &&
+      grants(flag.kind, gets, flag.offValue);
+    lines.push(
+      partial
+        ? `${share}% of ${who} ${describeValue(flag.kind, gets)}; the rest are treated like everyone else.`
+        : `${who} ${describeValue(flag.kind, gets)}.`,
+    );
+  }
+  lines.push(
+    `${lines.length > 0 ? "Everyone else" : "Every user"} ${describeValue(flag.kind, draft.defaultValue)}.`,
+  );
+  return lines;
 }
 
 export default function FlagPage() {
@@ -94,7 +223,12 @@ export default function FlagPage() {
       <PageHeader
         label="Feature flag"
         title={data.key}
-        description={data.description || "No description."}
+        description={
+          data.description ||
+          (data.kind === "boolean"
+            ? "An on/off switch: your app gets true or false."
+            : "A text flag: your app gets one of the values you choose.")
+        }
         actions={
           <Link
             className="button"
@@ -107,24 +241,42 @@ export default function FlagPage() {
       />
       {!isOwner && (
         <Banner title="Viewing as a member">
-          Only workspace owners can change flags. You can test them below.
+          Only workspace owners can change flags. You can check users below.
         </Banner>
       )}
 
-      <div className="segmented" role="group" aria-label="Environment">
-        {ENVIRONMENTS.map((name) => (
-          <button
-            key={name}
-            type="button"
-            aria-pressed={environment === name}
-            onClick={() => setEnvironment(name)}
-          >
-            {title(name)}{" "}
-            <span className="sr-only">
-              ({data.environments[name].enabled ? "on" : "off"})
-            </span>
-          </button>
-        ))}
+      <div className="flag-environments">
+        <p className="sec-label" id="environment-label">
+          Environment
+        </p>
+        <div
+          className="segmented"
+          role="group"
+          aria-labelledby="environment-label"
+        >
+          {ENVIRONMENTS.map((name) => (
+            <button
+              key={name}
+              type="button"
+              aria-pressed={environment === name}
+              onClick={() => setEnvironment(name)}
+            >
+              <span
+                className="flag-dot"
+                data-on={data.environments[name].enabled}
+                aria-hidden="true"
+              />
+              {title(name)}
+              <span className="sr-only">
+                ({data.environments[name].enabled ? "on" : "off"})
+              </span>
+            </button>
+          ))}
+        </div>
+        <p className="muted body-6">
+          Each environment has its own settings. Your app says which one it is
+          when it asks.
+        </p>
       </div>
 
       <EnvironmentEditor
@@ -140,13 +292,15 @@ export default function FlagPage() {
 
       <TestPanel flag={data} environment={environment} />
 
+      <UseInApp flag={data} environment={environment} />
+
       {isOwner && (
         <Card title="Delete flag">
           <div className="section">
             <h2>Delete flag</h2>
             <p className="muted">
               Apps asking for <code>{data.key}</code> stop getting it (it is
-              left out of their answers). Make sure no code still needs it.
+              left out of their answers). Remove it from your code first.
             </p>
             <div>
               <Button variant="danger" onClick={() => setDeleting(true)}>
@@ -192,23 +346,38 @@ export default function FlagPage() {
   );
 }
 
-function ValueInput({
+function StepTitle({ number, children }: { number: number; children: string }) {
+  return (
+    <h2 className="flag-step-title">
+      <span className="flag-step-number" aria-hidden="true">
+        {number}
+      </span>
+      {children}
+    </h2>
+  );
+}
+
+function ValueChoice({
   label,
   kind,
   value,
   onChange,
   disabled,
+  hideLabel = false,
 }: {
   label: string;
   kind: Flag["kind"];
   value: Value;
   onChange: (value: Value) => void;
   disabled: boolean;
+  hideLabel?: boolean;
 }) {
   const inputId = useId();
   return (
     <div className="field">
-      <label htmlFor={inputId}>{label}</label>
+      <label htmlFor={inputId} className={hideLabel ? "sr-only" : undefined}>
+        {label}
+      </label>
       {kind === "boolean" ? (
         <select
           id={inputId}
@@ -217,8 +386,8 @@ function ValueInput({
           disabled={disabled}
           onChange={(e) => onChange(e.target.value === "true")}
         >
-          <option value="true">true</option>
-          <option value="false">false</option>
+          <option value="true">Can see it</option>
+          <option value="false">Can&apos;t see it</option>
         </select>
       ) : (
         <input
@@ -247,78 +416,59 @@ function EnvironmentEditor({
 }) {
   const settings = flag.environments[environment];
   const { id } = useWorkspace();
-  const [enabled, setEnabled] = useState(settings.enabled);
-  const [rules, setRules] = useState<RuleDraft[]>(() => toDrafts(settings));
-  const [rollout, setRollout] = useState(
-    settings.rollout ? String(settings.rollout.percentage) : "",
-  );
-  const [rolloutValue, setRolloutValue] = useState<Value>(
-    settings.rollout?.value ?? (flag.kind === "boolean" ? true : ""),
-  );
-  const [defaultValue, setDefaultValue] = useState<Value>(
-    settings.defaultValue,
-  );
+  const [initial] = useState(() => JSON.stringify(toDraft(settings)));
+  const [draft, setDraft] = useState<Draft>(() => toDraft(settings));
+  const [picking, setPicking] = useState<PickBy>();
   const [problem, setProblem] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>();
   const switchId = useId();
-  const [removingRule, setRemovingRule] = useState<number>();
-  const newValue: Value = flag.kind === "boolean" ? true : "";
+  const changed = JSON.stringify(draft) !== initial;
+  const older = hasOlderSettings(settings);
+  const see: Value = flag.kind === "boolean" ? true : "";
 
-  function updateRule(index: number, change: Partial<RuleDraft>) {
-    setRules(
-      rules.map((rule, i) => (i === index ? { ...rule, ...change } : rule)),
-    );
-  }
+  const update = (change: Partial<Draft>) => setDraft({ ...draft, ...change });
+  const setTarget = (index: number, change: Partial<Target>) =>
+    update({
+      targets: draft.targets.map((t, i) =>
+        i === index ? { ...t, ...change } : t,
+      ),
+    });
 
-  function percentage(text: string): number | undefined | null {
-    if (text.trim() === "") return undefined;
-    const value = Number(text);
-    return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
+  function add(users: PickedUser[]) {
+    const known = new Set(draft.targets.map((t) => `${t.by}:${t.value}`));
+    const added = users
+      .map((user) => ({
+        by: user.by,
+        value: user.by === "id" ? user.id : user.email,
+        email: user.email,
+        gets: see,
+      }))
+      .filter((t) => !known.has(`${t.by}:${t.value}`));
+    update({ targets: [...draft.targets, ...added] });
+    setPicking(undefined);
   }
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    const built: FlagSettings = { enabled, rules: [], defaultValue };
-    for (const [index, rule] of rules.entries()) {
-      const share = percentage(rule.percentage);
-      if (share === null) {
-        setProblem(`Rule ${index + 1}: the percentage must be 0 to 100.`);
-        return;
-      }
-      const conditions = rule.conditions.map((condition) => ({
-        attribute: condition.attribute.trim(),
-        operator: condition.operator,
-        values: condition.values
-          .split(",")
-          .map((value) => value.trim())
-          .filter(Boolean),
-      }));
-      if (
-        conditions.some(
-          (c) =>
-            !/^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(c.attribute) ||
-            c.values.length === 0,
-        )
-      ) {
-        setProblem(
-          `Rule ${index + 1}: every condition needs an attribute name (letters, digits, _) and at least one value.`,
-        );
-        return;
-      }
-      built.rules.push({
-        conditions,
-        value: rule.value,
-        ...(share === undefined ? {} : { percentage: share }),
-      });
-    }
-    const share = percentage(rollout);
+    const share = shareOf(draft.share);
     if (share === null) {
-      setProblem("The rollout percentage must be 0 to 100.");
+      setProblem("The percentage must be 0 to 100.");
       return;
     }
-    if (share !== undefined)
-      built.rollout = { percentage: share, value: rolloutValue };
+    if (flag.kind === "string" && draft.targets.some((t) => t.gets === "")) {
+      setProblem("Give every chosen user a value.");
+      return;
+    }
+    const built: FlagSettings = {
+      enabled: draft.enabled,
+      rules: toRules(flag, draft, share),
+      defaultValue: draft.defaultValue,
+    };
+    if (built.rules.length > 20) {
+      setProblem("Too many users for one flag: choose fewer.");
+      return;
+    }
     setProblem(undefined);
     setBusy(true);
     setFailure(undefined);
@@ -332,177 +482,168 @@ function EnvironmentEditor({
   }
 
   return (
-    <Card title={`${title(environment)} settings`}>
+    <Card title={`Who sees it in ${environment}`}>
       <form
         className="section form"
         onSubmit={(event) => void save(event)}
         noValidate
       >
         <div className="row row-between">
-          <h2>{title(environment)}</h2>
+          <StepTitle number={1}>{`Who sees it in ${environment}`}</StepTitle>
           {settings.enabled ? (
             <Status tone="success">On</Status>
           ) : (
             <Status>Off</Status>
           )}
         </div>
-        <div className="checkbox-field">
+
+        {older && (
+          <Banner title="This flag has older settings">
+            It also has rules on other attributes or a share of everyone else,
+            which this page no longer shows. They keep working until you save
+            here; saving replaces them with what you see below.
+          </Banner>
+        )}
+
+        <div className="flag-switch" data-on={draft.enabled}>
           <input
             id={switchId}
             type="checkbox"
-            checked={enabled}
+            role="switch"
+            checked={draft.enabled}
             disabled={!editable}
-            onChange={(e) => setEnabled(e.target.checked)}
+            onChange={(e) => update({ enabled: e.target.checked })}
           />
           <label htmlFor={switchId}>
-            Flag is on in {environment} (off: everyone gets{" "}
-            <code>{String(flag.offValue)}</code>)
+            <strong>Turn on in {environment}</strong>
+            <span className="muted">
+              {draft.enabled
+                ? "On: the choices below decide who sees it."
+                : `Off: every user ${describeValue(flag.kind, flag.offValue)}, and the choices below are ignored.`}
+            </span>
           </label>
         </div>
 
-        <fieldset className="policy-fields">
-          <legend className="sec-label">
-            Targeting rules (first match wins)
-          </legend>
-          {rules.length === 0 && <p className="muted">No rules.</p>}
-          {rules.map((rule, index) => (
-            <div className="flag-rule" key={index}>
-              <p className="sec-label">Rule {index + 1}</p>
-              {rule.conditions.map((condition, c) => (
-                <div className="flag-condition" key={c}>
-                  <Field
-                    label="Attribute"
-                    value={condition.attribute}
-                    disabled={!editable}
-                    hint={
-                      c === 0
-                        ? 'e.g. country, plan; "key" is the user\'s key'
-                        : undefined
-                    }
-                    onChange={(e) =>
-                      updateRule(index, {
-                        conditions: rule.conditions.map((x, i) =>
-                          i === c ? { ...x, attribute: e.target.value } : x,
-                        ),
-                      })
-                    }
-                  />
-                  <OperatorSelect
-                    value={condition.operator}
-                    disabled={!editable}
-                    onChange={(operator) =>
-                      updateRule(index, {
-                        conditions: rule.conditions.map((x, i) =>
-                          i === c ? { ...x, operator } : x,
-                        ),
-                      })
-                    }
-                  />
-                  <Field
-                    label="Values"
-                    value={condition.values}
-                    disabled={!editable}
-                    hint="Comma-separated"
-                    onChange={(e) =>
-                      updateRule(index, {
-                        conditions: rule.conditions.map((x, i) =>
-                          i === c ? { ...x, values: e.target.value } : x,
-                        ),
-                      })
-                    }
-                  />
-                </div>
-              ))}
+        <ol className="flag-steps" data-off={!draft.enabled}>
+          <li className="flag-step">
+            <h3>Chosen users</h3>
+            <p className="muted">
+              Optional. Pick people from your user pools and decide, for each,
+              whether they can see it. They come before everyone else.
+            </p>
+            {draft.targets.length === 0 ? (
+              <p className="muted">Nobody chosen yet.</p>
+            ) : (
+              <div className="table-wrap">
+                <table className="table" aria-label="Chosen users">
+                  <thead>
+                    <tr>
+                      <th scope="col">User</th>
+                      <th scope="col">Matched by</th>
+                      <th scope="col">
+                        {flag.kind === "boolean" ? "Can they see it?" : "Gets"}
+                      </th>
+                      <th scope="col">
+                        <span className="sr-only">Remove</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {draft.targets.map((target, index) => (
+                      <tr key={`${target.by}:${target.value}`}>
+                        <td data-label="User">
+                          {target.email ?? <code>{target.value}</code>}
+                          {target.by === "id" && target.email && (
+                            <p className="muted">
+                              <code>{target.value}</code>
+                            </p>
+                          )}
+                        </td>
+                        <td data-label="Matched by">
+                          {target.by === "id" ? "User ID" : "Email"}
+                        </td>
+                        <td data-label="Can they see it?">
+                          <ValueChoice
+                            label={`What ${target.email ?? target.value} gets`}
+                            hideLabel
+                            kind={flag.kind}
+                            value={target.gets}
+                            disabled={!editable}
+                            onChange={(gets) => setTarget(index, { gets })}
+                          />
+                        </td>
+                        <td className="actions">
+                          {editable && (
+                            <Button
+                              variant="ghost"
+                              aria-label={`Remove ${target.email ?? target.value}`}
+                              onClick={() =>
+                                update({
+                                  targets: draft.targets.filter(
+                                    (_, i) => i !== index,
+                                  ),
+                                })
+                              }
+                            >
+                              Remove
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {editable && (
+              <div className="row">
+                <Button onClick={() => setPicking("email")}>
+                  Add users by email
+                </Button>
+                <Button onClick={() => setPicking("id")}>
+                  Add users by ID
+                </Button>
+              </div>
+            )}
+            {draft.targets.some((t) =>
+              grants(flag.kind, t.gets, flag.offValue),
+            ) && (
               <div className="flag-condition">
-                <ValueInput
-                  label="Serve"
-                  kind={flag.kind}
-                  value={rule.value}
-                  disabled={!editable}
-                  onChange={(value) => updateRule(index, { value })}
-                />
                 <Field
-                  label="To this share (%)"
+                  label="How many of them can see it (%)"
                   type="number"
                   inputMode="decimal"
-                  value={rule.percentage}
+                  value={draft.share}
+                  placeholder="100"
                   disabled={!editable}
-                  hint="Empty: everyone matching"
-                  onChange={(e) =>
-                    updateRule(index, { percentage: e.target.value })
-                  }
+                  hint="Of the chosen users marked can see it. Empty or 100: all of them; the rest are treated like everyone else."
+                  onChange={(e) => update({ share: e.target.value })}
                 />
               </div>
-              {editable && (
-                <div className="row">
-                  <Button
-                    onClick={() =>
-                      updateRule(index, {
-                        conditions: [
-                          ...rule.conditions,
-                          { attribute: "", operator: "equals", values: "" },
-                        ],
-                      })
-                    }
-                  >
-                    Add condition
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => setRemovingRule(index)}
-                  >
-                    Remove rule {index + 1}
-                  </Button>
-                </div>
-              )}
-            </div>
-          ))}
-          {editable && (
-            <div>
-              <Button
-                onClick={() =>
-                  setRules([
-                    ...rules,
-                    {
-                      conditions: [
-                        { attribute: "", operator: "equals", values: "" },
-                      ],
-                      value: newValue,
-                      percentage: "",
-                    },
-                  ])
-                }
-              >
-                Add rule
-              </Button>
-            </div>
-          )}
-        </fieldset>
+            )}
+          </li>
 
-        <div className="flag-condition">
-          <Field
-            label="Percentage rollout (%)"
-            type="number"
-            inputMode="decimal"
-            value={rollout}
-            disabled={!editable}
-            hint="After the rules: this share of everyone else. Empty: none."
-            onChange={(e) => setRollout(e.target.value)}
-          />
-          <ValueInput
-            label="Rollout serves"
-            kind={flag.kind}
-            value={rolloutValue}
-            disabled={!editable}
-            onChange={setRolloutValue}
-          />
-          <ValueInput
-            label="Everyone else gets"
-            kind={flag.kind}
-            value={defaultValue}
-            disabled={!editable}
-            onChange={setDefaultValue}
-          />
+          <li className="flag-step">
+            <h3>Everyone else</h3>
+            <div className="flag-condition">
+              <ValueChoice
+                label="Everyone else"
+                kind={flag.kind}
+                value={draft.defaultValue}
+                disabled={!editable}
+                onChange={(defaultValue) => update({ defaultValue })}
+              />
+            </div>
+          </li>
+        </ol>
+
+        <div className="flag-summary">
+          <p className="sec-label">In plain words</p>
+          <ul>
+            {summary(flag, environment, draft).map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
         </div>
 
         {problem && (
@@ -511,62 +652,26 @@ function EnvironmentEditor({
           </p>
         )}
         <FormError error={failure} />
-        <ConfirmDialog
-          open={removingRule !== undefined}
-          title="Remove rule"
-          confirmLabel="Remove rule"
-          busyLabel="Removing..."
-          busy={false}
-          onConfirm={() => {
-            setRules(rules.filter((_, i) => i !== removingRule));
-            setRemovingRule(undefined);
-          }}
-          onCancel={() => setRemovingRule(undefined)}
-        >
-          <p>
-            Rule {(removingRule ?? 0) + 1} is taken out of the form. Nothing
-            changes for users until you save.
-          </p>
-        </ConfirmDialog>
         {editable && (
-          <div className="form-actions">
+          <div className="form-actions flag-save">
+            {changed && (
+              <span className="muted body-6">
+                Unsaved changes: users still get the saved settings.
+              </span>
+            )}
             <Button variant="primary" type="submit" disabled={busy}>
               {busy ? "Saving..." : `Save ${environment}`}
             </Button>
           </div>
         )}
       </form>
+      <UserPicker
+        by={picking}
+        onClose={() => setPicking(undefined)}
+        onAdd={add}
+        chosen={draft.targets.map((t) => `${t.by}:${t.value}`)}
+      />
     </Card>
-  );
-}
-
-function OperatorSelect({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: Operator;
-  onChange: (operator: Operator) => void;
-  disabled: boolean;
-}) {
-  const selectId = useId();
-  return (
-    <div className="field">
-      <label htmlFor={selectId}>Operator</label>
-      <select
-        id={selectId}
-        className="select"
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value as Operator)}
-      >
-        {OPERATORS.map(([operator, label]) => (
-          <option key={operator} value={operator}>
-            {label}
-          </option>
-        ))}
-      </select>
-    </div>
   );
 }
 
@@ -578,39 +683,23 @@ function TestPanel({
   environment: FlagEnvironmentName;
 }) {
   const { id } = useWorkspace();
-  const [userKey, setUserKey] = useState("user-123");
-  const [attributes, setAttributes] = useState("country=SG");
+  const [userId, setUserId] = useState("");
+  const [email, setEmail] = useState("");
   const [result, setResult] = useState<FlagEvaluation["flags"][string]>();
-  const [problem, setProblem] = useState<string>();
   const [failure, setFailure] = useState<unknown>();
-  const attributesId = useId();
 
   useEffect(() => setResult(undefined), [environment, flag.updatedAt]);
 
   async function test(event: FormEvent) {
     event.preventDefault();
-    const parsed: Record<string, string> = {};
-    for (const line of attributes
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean)) {
-      const [name, ...rest] = line.split("=");
-      if (
-        !name ||
-        rest.length === 0 ||
-        !/^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(name.trim())
-      ) {
-        setProblem(`"${line}" isn't name=value.`);
-        return;
-      }
-      parsed[name.trim()] = rest.join("=").trim();
-    }
-    setProblem(undefined);
     setFailure(undefined);
     try {
       const answer = await api.testFlags(id, {
         environment,
-        context: { key: userKey.trim() || "anonymous", attributes: parsed },
+        context: {
+          key: userId.trim() || "anonymous",
+          attributes: email.trim() ? { email: email.trim() } : {},
+        },
         keys: [flag.key],
       });
       setResult(answer.flags[flag.key]);
@@ -620,60 +709,109 @@ function TestPanel({
   }
 
   const reasons = {
-    off: "the flag is off in this environment",
-    rule: "a targeting rule matched",
-    rollout: "the user is in the percentage rollout",
-    default: "no rule matched and they're not in the rollout",
+    off: `the flag is off in ${environment}`,
+    rule: "they are one of the chosen users",
+    rollout: "they are in the share of everyone else",
+    default: "they aren't a chosen user, so they get what everyone else gets",
   } as const;
 
   return (
-    <Card title="Test a user">
+    <Card title="Check a user">
       <form
         className="section form"
         onSubmit={(event) => void test(event)}
         noValidate
       >
-        <h2>Test a user</h2>
+        <StepTitle number={2}>Check a user</StepTitle>
         <p className="muted">
-          What {environment} serves this user right now, as an app would see it.
+          See what {environment} gives someone right now (saved settings only),
+          as your app would see it.
         </p>
-        <Field
-          label="User key"
-          value={userKey}
-          onChange={(e) => setUserKey(e.target.value)}
-          hint="Usually the user's ID; percentages are stable per key."
-          maxLength={200}
-        />
-        <div className="field">
-          <label htmlFor={attributesId}>Attributes</label>
-          <textarea
-            id={attributesId}
-            className="input textarea"
-            rows={3}
-            value={attributes}
-            onChange={(e) => setAttributes(e.target.value)}
+        <div className="flag-condition">
+          <Field
+            label="User ID"
+            value={userId}
+            placeholder="the user's ID"
+            onChange={(e) => setUserId(e.target.value)}
+            maxLength={200}
           />
-          <p className="hint">One name=value per line, e.g. plan=pro.</p>
+          <Field
+            label="Email"
+            type="email"
+            value={email}
+            placeholder="ada@example.com"
+            onChange={(e) => setEmail(e.target.value)}
+            maxLength={200}
+          />
         </div>
-        {problem && (
-          <p className="field-error" role="alert">
-            {problem}
-          </p>
-        )}
         <FormError error={failure} />
         <div className="form-actions">
-          <Button type="submit">Test</Button>
+          <Button type="submit" variant="primary">
+            Check
+          </Button>
         </div>
         {result && (
-          <p role="status">
-            Serves <code>{String(result.value)}</code>:{" "}
-            {result.reason === "rule"
-              ? `rule ${(result.ruleIndex ?? 0) + 1} matched`
-              : reasons[result.reason]}
-            .
-          </p>
+          <div className="flag-result" role="status">
+            <p className="sec-label">Result</p>
+            <p>
+              {flag.kind === "boolean" ? (
+                <strong>
+                  {result.value === true ? "Can see it" : "Can't see it"}
+                </strong>
+              ) : (
+                <>
+                  Gets <code>&quot;{String(result.value)}&quot;</code>
+                </>
+              )}
+              , because {reasons[result.reason]}.
+            </p>
+          </div>
         )}
       </form>
+    </Card>
+  );
+}
+
+function UseInApp({
+  flag,
+  environment,
+}: {
+  flag: Flag;
+  environment: FlagEnvironmentName;
+}) {
+  const use =
+    flag.kind === "boolean"
+      ? `if (await flags.isOn("${flag.key}", user)) {
+  // show the new feature
+}`
+      : `const variant = await flags.value("${flag.key}", user, ${JSON.stringify(flag.offValue)});`;
+  const code = `const { SecureCloud } = require("@secure-cloud/sdk");
+
+const flags = new SecureCloud().flags("${environment}");
+
+// in a route, for the signed in user:
+const user = { id: req.user.id, email: req.user.email };
+${use}`;
+  return (
+    <Card title="Read it in your app">
+      <div className="section">
+        <div className="row row-between">
+          <StepTitle number={3}>Read it in your app</StepTitle>
+          <CopyButton value={code} label="Copy the code" />
+        </div>
+        <p className="muted">
+          Your app&apos;s server asks on each request, with the SDK. Set{" "}
+          <code>SECURE_CLOUD_API_KEY</code> (from API keys, never in the
+          browser) and <code>SECURE_CLOUD_URL={apiUrl("")}</code>. Pass the
+          user&apos;s ID from the user pool and their email, so the users you
+          chose are recognised. Changes here apply on the next request: no
+          redeploy. More in the{" "}
+          <Link href="/docs/flags">feature flags docs</Link>.
+        </p>
+        <pre className="code-block">
+          <code>{code}</code>
+        </pre>
+      </div>
     </Card>
   );
 }
