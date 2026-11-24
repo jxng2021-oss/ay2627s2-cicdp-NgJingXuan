@@ -72,8 +72,22 @@ async function payOnStripe(
   await card.locator("#payment-expiryInput").fill("12 / 34");
   await card.locator("#payment-cvcInput").fill("123");
   await card.locator("#payment-nameInput").fill("Test Shopper");
+  await useSingaporeBilling(card);
   await card.getByTestId("payment-form-submit-button").click();
   return card;
+}
+
+async function useSingaporeBilling(card: Frame) {
+  const country = card.getByRole("combobox", { name: /country/i });
+  if (await country.isVisible()) await country.selectOption("SG");
+  const postalCode = card.getByPlaceholder(/zip|postal/i);
+  if (await postalCode.isVisible()) await postalCode.fill("018956");
+  const saveForLater = card.getByRole("checkbox", {
+    name: /save my information/i,
+  });
+  if ((await saveForLater.isVisible()) && (await saveForLater.isChecked())) {
+    await saveForLater.uncheck();
+  }
 }
 
 async function expectAccessible(page: Page) {
