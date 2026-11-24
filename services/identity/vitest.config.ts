@@ -5,6 +5,13 @@ export default defineConfig({
     dedupe: ["vitest", "fastify", "drizzle-orm", "@electric-sql/pglite"],
   },
   test: {
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.d.ts"],
+      reporter: ["text-summary", "json-summary", "html"],
+      reportsDirectory: "../../coverage/identity",
+    },
     include: ["../../tests/identity/**/*.test.ts"],
     testTimeout: 30_000,
     maxWorkers: 4,
