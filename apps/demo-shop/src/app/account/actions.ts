@@ -42,7 +42,7 @@ export async function signIn(
     await saveTokens(tokens);
     resetRequired = tokens.passwordResetRequired;
   } catch (error) {
-    if (error instanceof PlatformError && error.status === 401) {
+    if (error instanceof PlatformError && error.code === "UNAUTHORIZED") {
       return {
         email,
         error: {
@@ -90,7 +90,7 @@ export async function choosePassword(
     await changeShopperPassword(shopper.id, current, next);
     await saveTokens(await signInShopper(shopper.email, next));
   } catch (error) {
-    if (error instanceof PlatformError && error.status === 401) {
+    if (error instanceof PlatformError && error.code === "UNAUTHORIZED") {
       return {
         error: {
           title: "Wrong current password",

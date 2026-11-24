@@ -44,10 +44,6 @@ export default async function ProductPage({
             <p className="muted">{product.description}</p>
           </div>
           <BuyForm slug={product.slug} />
-          <p className="muted">
-            Demo: the platform&apos;s payment policy blocks orders over S$500.00
-            (S$2,000.00 a day).
-          </p>
         </div>
       </div>
     </>

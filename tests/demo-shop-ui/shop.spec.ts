@@ -206,10 +206,13 @@ test("the platform's payment policy blocks an order over S$500, before the key i
 }) => {
   await signUpShopper(page);
   await page.goto("/products/studio-headphones");
+  await expect(page.getByRole("main")).not.toContainText("S$500");
   await page.getByRole("button", { name: "Buy Now" }).click();
   const banner = page.locator(".banner[role=alert]");
   await expect(banner).toContainText("Blocked by the payment policy");
+  await expect(banner).toContainText("over the shop's payment limit");
   await expect(banner).toContainText(/Request ID [0-9a-f-]{36}/);
+  await expect(banner).not.toContainText(/S\$|Stripe key|API key/);
   expect(page.url()).toContain("/products/studio-headphones");
 });
 
