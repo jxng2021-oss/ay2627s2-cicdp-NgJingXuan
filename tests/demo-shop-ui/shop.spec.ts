@@ -78,13 +78,13 @@ async function payOnStripe(
 }
 
 async function useSingaporeBilling(card: Frame) {
-  const country = card.getByRole("combobox", { name: /country/i });
+  const country = card.locator("#payment-countryInput");
   if (await country.isVisible()) await country.selectOption("SG");
-  const postalCode = card.getByPlaceholder(/zip|postal/i);
+  const postalCode = card.getByPlaceholder(/zip|postal/i).first();
   if (await postalCode.isVisible()) await postalCode.fill("018956");
-  const saveForLater = card.getByRole("checkbox", {
-    name: /save my information/i,
-  });
+  const saveForLater = card
+    .getByRole("checkbox", { name: /save my information/i })
+    .first();
   if ((await saveForLater.isVisible()) && (await saveForLater.isChecked())) {
     await saveForLater.uncheck();
   }
