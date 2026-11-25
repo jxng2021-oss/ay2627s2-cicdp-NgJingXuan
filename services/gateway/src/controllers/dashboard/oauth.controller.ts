@@ -97,6 +97,16 @@ export function oauthController(options: DashboardOptions) {
         );
       } catch (failure) {
         if (failure instanceof OAuthError) {
+          request.log.warn(
+            {
+              provider,
+              reason: failure.reason,
+              step: failure.detail.step,
+              status: failure.detail.status,
+              providerError: failure.detail.providerError,
+            },
+            "sign in with the provider failed",
+          );
           return backToLogin(reply, failure.reason);
         }
         request.log.warn(
