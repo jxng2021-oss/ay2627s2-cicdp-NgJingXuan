@@ -68,6 +68,29 @@ Common warnings in the gateway's logs:
 | `couldn't reach the sign in provider` | The server couldn't reach Google or GitHub                                                      | Check the server's outbound network                |
 | `AUDIT EVENT LOST`                    | An audit event couldn't be saved after retries                                                  | Check the audit service and Postgres               |
 
+## The audit log
+
+Every sensitive action (keys, secrets, files, connections, sign ins, pool and
+flag changes, sealing) is recorded once, with an HMAC chained to the previous
+event, so any edit or deletion breaks the chain. Events hold IDs, the outcome,
+the request ID and the IP: never values, keys or file contents.
+
+- **A workspace's events:** the dashboard's **Audit log** page (filter by
+  action, outcome, resource and time), or `GET /v1/audit-events` with the
+  workspace's API key. A user pool's events are on **User activity**.
+- **Finding a request:** filter by the request ID the user reported, or
+  `dc logs gateway | grep <request ID>` for the matching log line.
+- **Checking nothing was changed:** verify every chain (each workspace, each
+  user pool and the platform's own):
+
+  ```sh
+  dc exec audit node dist/verify.js --all
+  ```
+
+  It reports any chain whose hashes don't match. The audit database login can
+  only insert and read rows, so a mismatch means the database was changed
+  outside the platform: treat it as an incident.
+
 ## Changing a server setting
 
 The server's own secrets (database passwords, the Google and GitHub client

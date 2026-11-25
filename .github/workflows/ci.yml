@@ -88,13 +88,23 @@ jobs:
           path: ~/.cargo/bin/cargo-llvm-cov
           key: cargo-llvm-cov-0.9.1-${{ runner.os }}
       - run: pnpm test:coverage:install
-      - run: pnpm test:coverage
+      - name: Unit and contract tests with coverage (log kept for the QA report)
+        run: |
+          mkdir -p qa/results
+          pnpm test:coverage 2>&1 | tee qa/results/unit-tests.log
       - run: pnpm test:database
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: coverage
-          path: coverage/
+          path: qa/coverage/
+          retention-days: 14
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: unit-test-results
+          path: qa/results/
           retention-days: 14
           if-no-files-found: ignore
 
@@ -310,6 +320,14 @@ jobs:
         if: always()
         run: pnpm stack:down
 
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: e2e-test-results
+          path: qa/results/
+          retention-days: 14
+          if-no-files-found: ignore
+
   secret-scan:
     name: "1.9 Secret scan (Gitleaks)"
     runs-on: ubuntu-latest
@@ -327,7 +345,7 @@ jobs:
         if: always()
         with:
           name: secret-scan-report
-          path: reports/
+          path: qa/scans/
           retention-days: 7
           if-no-files-found: ignore
 
@@ -347,7 +365,7 @@ jobs:
         if: always()
         with:
           name: code-scan-report
-          path: reports/
+          path: qa/scans/
           retention-days: 7
           if-no-files-found: ignore
 
@@ -367,7 +385,7 @@ jobs:
         if: always()
         with:
           name: dependency-scan-report
-          path: reports/
+          path: qa/scans/
           retention-days: 7
           if-no-files-found: ignore
 
@@ -423,7 +441,7 @@ jobs:
         if: always()
         with:
           name: image-scan-report
-          path: reports/
+          path: qa/scans/
           retention-days: 7
           if-no-files-found: ignore
 
@@ -572,3 +590,69 @@ jobs:
           fi
           echo "Deploy finished with status $status"
           [[ "$status" == "Success" ]]
+
+  qa-report:
+    name: "6. QA report"
+    if: always() && !cancelled()
+    needs:
+      - lint
+      - typecheck
+      - unit-tests
+      - compatibility
+      - build
+      - migrations
+      - api-spec
+      - api-breaking-changes
+      - docker-build
+      - e2e
+      - secret-scan
+      - code-scan
+      - dependency-scan
+      - rust-audit
+      - image-scan
+      - ci-success
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          install-dependencies: "false"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: qa-input/
+      - run: pnpm qa:report
+        env:
+          QA_INPUT: qa-input
+          QA_OUTPUT: qa/report
+          QA_JOBS: ${{ toJSON(needs) }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: qa-report
+          path: qa/report/
+          retention-days: 30
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        with:
+          path: qa/report/
+
+  qa-report-pages:
+    name: "7. Publish the QA report (GitHub Pages)"
+    needs: qa-report
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

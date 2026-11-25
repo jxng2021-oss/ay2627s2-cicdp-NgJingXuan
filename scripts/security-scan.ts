@@ -29,7 +29,7 @@ const APP_IMAGES = [
   "secure-cloud-platform/dashboard:dev",
 ];
 
-const REPORTS_DIR = "reports";
+const REPORTS_DIR = "qa/scans";
 const CACHE_DIR = ".cache";
 
 type Scan = "secrets" | "code" | "deps" | "images";

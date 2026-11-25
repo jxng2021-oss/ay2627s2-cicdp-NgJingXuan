@@ -11,12 +11,14 @@ export default defineConfig({
     ],
   },
   test: {
+    reporters: ["default", "json"],
+    outputFile: { json: "../../qa/results/gateway.json" },
     coverage: {
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],
       exclude: ["src/**/*.d.ts"],
-      reporter: ["text-summary", "json-summary", "html"],
-      reportsDirectory: "../../coverage/gateway",
+      reporter: ["text-summary", "json-summary", "lcov"],
+      reportsDirectory: "../../qa/coverage/gateway",
     },
     include: ["../../tests/gateway/**/*.test.ts"],
     testTimeout: 30_000,

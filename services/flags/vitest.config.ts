@@ -5,12 +5,14 @@ export default defineConfig({
     dedupe: ["vitest", "fastify", "drizzle-orm", "@electric-sql/pglite"],
   },
   test: {
+    reporters: ["default", "json"],
+    outputFile: { json: "../../qa/results/flags.json" },
     coverage: {
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],
       exclude: ["src/**/*.d.ts"],
-      reporter: ["text-summary", "json-summary", "html"],
-      reportsDirectory: "../../coverage/flags",
+      reporter: ["text-summary", "json-summary", "lcov"],
+      reportsDirectory: "../../qa/coverage/flags",
     },
     include: ["../../tests/flags/**/*.test.ts"],
     testTimeout: 30_000,

@@ -20,6 +20,7 @@ the Node.js SDK.
 
 - Live dashboard: https://securee-cloud.duckdns.org
 - Live API: https://api.securee-cloud.duckdns.org
+- QA report: https://jxng2021-oss.github.io/ay2627s2-cicdp-NgJingXuan/
 
 ## Architecture
 
@@ -70,6 +71,30 @@ http://127.0.0.1:8080. After every restart:
 `pnpm local:stop` stops the stack and keeps the data; `pnpm local:reset`
 deletes it.
 
+## Trying it with curl
+
+In the dashboard, create a workspace and an API key (**API keys → Create API
+key**), then:
+
+```sh
+KEY=<your API key>
+API=http://127.0.0.1:8080            # or https://api.securee-cloud.duckdns.org
+
+# save a secret (write-only: no route ever returns its value)
+curl -X PUT "$API/v1/secrets/db-password" -H "Authorization: Bearer $KEY"   -H "Content-Type: application/json" -d '{"value":"example-value"}'
+curl "$API/v1/secrets/db-password" -H "Authorization: Bearer $KEY"   # metadata only
+
+# upload a file (encrypted before it reaches the disk), list it, download it
+curl -X POST "$API/v1/storage/files" -H "Authorization: Bearer $KEY"   -H "Content-Type: text/plain" -H "X-File-Name: hello.txt" --data-binary "hello"
+curl "$API/v1/storage/files" -H "Authorization: Bearer $KEY"
+curl "$API/v1/storage/files/<file id>" -H "Authorization: Bearer $KEY"
+
+# what happened, from the tamper-evident audit log
+curl "$API/v1/audit-events?limit=10" -H "Authorization: Bearer $KEY"
+```
+
+Every route, error and limit is in the [API guide](docs/api.md).
+
 ## Checks
 
 ```sh
@@ -84,6 +109,7 @@ pnpm test:e2e          # end-to-end tests against the running stack
 pnpm test:ui           # dashboard browser tests (Playwright + axe)
 pnpm test:demo         # demo shop browser tests
 pnpm api:check         # the committed OpenAPI specs match the code
+pnpm qa:report         # build the QA report from the results above (qa/report/)
 pnpm api:breaking      # no breaking change to /v1
 pnpm scan:secrets      # Gitleaks; also scan:code (Semgrep), scan:deps and
                        # scan:images (Trivy), scan:rust (cargo audit)
@@ -106,9 +132,11 @@ keys (GitHub OIDC).
 
 - [API guide](docs/api.md): authentication, routes, errors, limits, versioning
 - [Runbook](docs/runbook.md): unsealing, health checks, settings, rolling back
+- [QA report](https://jxng2021-oss.github.io/ay2627s2-cicdp-NgJingXuan/): built by the pipeline from every run on `main`
+  (tests, coverage, scans and quality gates), published on GitHub Pages
 - [Deploying to EC2](docs/deploy-ec2.md): setting the server up
 - [Architecture decision records](docs/decisions/README.md): why it is built
-  this way (40 records)
+  this way (41 records)
 - [Demo shop: local or live](docs/demo-shop-targets.md)
 - [Continue with Google and GitHub](docs/google-github-sign-in.md)
 - [CHANGELOG](CHANGELOG.md): every change to the public API
