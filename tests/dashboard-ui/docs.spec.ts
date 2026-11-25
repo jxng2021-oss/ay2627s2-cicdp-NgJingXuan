@@ -51,6 +51,26 @@ test("examples have copy buttons, and the quickstart never shows a real key", as
   );
 });
 
+test("the docs say which providers connections and webhooks support, and what the amount limit counts", async ({
+  page,
+}) => {
+  await page.goto("/docs/connections");
+  await expect(
+    page.getByRole("heading", { name: "Which providers work" }),
+  ).toBeVisible();
+  await expect(page.getByText("SendGrid (email)")).toBeVisible();
+  await expect(
+    page.getByText(/a checkout that the customer never completes still counts/),
+  ).toBeVisible();
+
+  await page.goto("/docs/webhooks");
+  await expect(
+    page.getByText("Webhooks support Stripe only for now."),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "connections", exact: true }).click();
+  await page.waitForURL("**/docs/connections");
+});
+
 test("every docs page passes axe, on desktop and a phone", async ({ page }) => {
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 844 });

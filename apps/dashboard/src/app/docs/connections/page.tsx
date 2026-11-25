@@ -35,6 +35,38 @@ export default function ConnectionsDocsPage() {
           5,000 in amounts a day. They are checked before the key is used.
         </li>
       </ol>
+      <Note>
+        The amount limit counts the amount of every call the provider accepted,
+        whether or not it was paid in the end. For example, a checkout that the
+        customer never completes still counts towards the day. Set the daily
+        limit with abandoned checkouts in mind.
+      </Note>
+
+      <h2 className="heading-5">Which providers work</h2>
+      <p>Any HTTPS API that takes its key in a header. Some common ones:</p>
+      <ul>
+        <li>
+          Stripe (payments): header <code>Authorization</code>, prefix{" "}
+          <code>Bearer </code>
+        </li>
+        <li>
+          SendGrid (email): header <code>Authorization</code>, prefix{" "}
+          <code>Bearer </code>
+        </li>
+        <li>
+          OpenAI (AI): header <code>Authorization</code>, prefix{" "}
+          <code>Bearer </code>
+        </li>
+        <li>
+          An API with its own header: for example <code>X-API-Key</code>, with
+          no prefix
+        </li>
+      </ul>
+      <p>
+        The provider&apos;s host must be on the platform&apos;s allowed list,
+        which the platform operator manages. A host that isn&apos;t on it is
+        refused when you create the connection.
+      </p>
 
       <h2 className="heading-5">Make a call</h2>
       <Code title="server.js">{`

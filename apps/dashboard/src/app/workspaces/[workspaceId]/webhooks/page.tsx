@@ -120,6 +120,11 @@ function HowItWorks() {
           secure-cloud can&apos;t reach it (for example on localhost).
         </li>
       </ol>
+      <p className="muted">
+        Webhooks support Stripe only for now. To call other providers, such as
+        an email or AI API, use Connections: they work with any HTTPS API that
+        takes its key in a header.
+      </p>
     </Card>
   );
 }
