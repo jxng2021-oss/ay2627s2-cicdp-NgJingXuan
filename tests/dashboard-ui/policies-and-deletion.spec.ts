@@ -80,12 +80,30 @@ test("an owner sets a policy, a refused call shows in the audit log, and the pol
   await page.goto(connectionUrl);
   const usage = page.getByRole("region", { name: "Usage" });
   await expect(usage).toContainText("0 of 800");
-  await expect(usage).toContainText("The total of amount in every call");
+  await expect(usage).toContainText("Counted from amount.");
+  const amountInfo = usage.getByRole("button", {
+    name: "What counts towards the amount today",
+  });
+  await amountInfo.click();
+  await expect(amountInfo).toHaveAttribute("aria-expanded", "true");
+  await expect(usage.getByRole("tooltip")).toContainText(
+    "An abandoned checkout still counts.",
+  );
+  await amountInfo.press("Escape");
+  await expect(amountInfo).toHaveAttribute("aria-expanded", "false");
   await expect(
     usage.getByRole("meter", { name: "Amount requested today" }),
   ).toBeVisible();
 
   const edit = page.getByRole("region", { name: "Edit policy" });
+  const dayInfo = edit.getByRole("button", {
+    name: "What counts towards the daily amount",
+  });
+  await dayInfo.click();
+  await expect(dayInfo).toHaveAttribute("aria-expanded", "true");
+  await expect(edit.getByRole("tooltip")).toContainText(
+    "An abandoned checkout still counts",
+  );
   await expect(edit.getByLabel("Max per call")).toHaveValue("500");
   await edit.getByLabel("Max per call").fill("1000");
   await edit.getByLabel("Max per day").fill("5000");

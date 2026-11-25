@@ -1,6 +1,13 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ConfirmDialog, ErrorState, shorten, Status } from "@/components/ui";
+import {
+  ConfirmDialog,
+  ErrorState,
+  Field,
+  InfoTip,
+  shorten,
+  Status,
+} from "@/components/ui";
 import { ApiError, NetworkError } from "@/lib/api/client";
 import { loginUrl, safeNext } from "@/lib/safe-redirect";
 
@@ -135,5 +142,45 @@ describe("shorten", () => {
     expect(shorten("abc")).toBe("abc");
     const id = "3f2c9b1e-6a4d-4c8e-9f1a-2b3c4d5e6f70";
     expect(shorten(id)).toBe("3f2c9b1e-6a4…5e6f70");
+  });
+});
+
+describe("InfoTip", () => {
+  it("names its button, describes it with the tip, and opens and closes from the keyboard", () => {
+    render(
+      <InfoTip label="What counts towards the daily amount">
+        An abandoned checkout still counts.
+      </InfoTip>,
+    );
+
+    const button = screen.getByRole("button", {
+      name: "What counts towards the daily amount",
+    });
+    const tip = screen.getByRole("tooltip");
+    expect(tip.textContent).toBe("An abandoned checkout still counts.");
+    expect(button.getAttribute("aria-describedby")).toBe(tip.id);
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(button);
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.keyDown(button, { key: "Escape" });
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(button);
+    fireEvent.blur(button);
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("sits beside a field's label without becoming part of the label", () => {
+    render(
+      <Field
+        label="Max per day"
+        hint="UTC day."
+        info={<InfoTip label="What counts">Every accepted call.</InfoTip>}
+      />,
+    );
+
+    expect(screen.getByLabelText("Max per day").tagName).toBe("INPUT");
+    expect(screen.getByRole("button", { name: "What counts" })).toBeTruthy();
   });
 });

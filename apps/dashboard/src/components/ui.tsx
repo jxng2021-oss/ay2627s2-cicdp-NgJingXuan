@@ -25,22 +25,63 @@ export function Button({
   );
 }
 
+export function InfoTip({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="info-tip" data-open={open || undefined}>
+      <button
+        type="button"
+        className="info-tip-button"
+        aria-label={label}
+        aria-describedby={id}
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") setOpen(false);
+        }}
+      >
+        <Icon name="info" size={16} />
+      </button>
+      <span role="tooltip" id={id} className="info-tip-text">
+        {children}
+      </span>
+    </span>
+  );
+}
+
 export function Field({
   label,
   hint,
   error,
+  info,
   ...input
 }: InputHTMLAttributes<HTMLInputElement> & {
   label: string;
   hint?: string;
   error?: string;
+  info?: ReactNode;
 }) {
   const id = useId();
   const hintId = hint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   return (
     <div className="field">
-      <label htmlFor={id}>{label}</label>
+      {info ? (
+        <span className="field-label">
+          <label htmlFor={id}>{label}</label>
+          {info}
+        </span>
+      ) : (
+        <label htmlFor={id}>{label}</label>
+      )}
       <input
         {...input}
         id={id}

@@ -18,6 +18,7 @@ import {
   EmptyState,
   ErrorState,
   FormError,
+  InfoTip,
   Loading,
   PageHeader,
   formatDate,
@@ -246,16 +247,21 @@ function Usage({ connection }: { connection: Connection }) {
             )}
             {usage.data.amount && (
               <div className="stack-2">
-                <p className="sec-label">
-                  Amount requested today ({usage.data.day} UTC)
-                </p>
+                <span className="field-label">
+                  <span className="sec-label">
+                    Amount requested today ({usage.data.day} UTC)
+                  </span>
+                  <InfoTip label="What counts towards the amount today">
+                    Every call the outside API accepted counts, whether or not
+                    it was paid in the end. An abandoned checkout still counts.
+                  </InfoTip>
+                </span>
                 <p className="mono">
                   {n(usage.data.amount.usedToday)} of{" "}
                   {n(usage.data.amount.maxPerDay)}
                 </p>
                 <p className="hint">
-                  The total of <code>{usage.data.amount.field}</code> in every
-                  call the outside API accepted, whether or not it was paid.
+                  Counted from <code>{usage.data.amount.field}</code>.
                 </p>
                 <div
                   className="progress"

@@ -2,7 +2,7 @@
 
 import { useId } from "react";
 import type { ConnectionPolicy } from "@/lib/api/client";
-import { Field } from "./ui";
+import { Field, InfoTip } from "./ui";
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] as const;
 type Method = (typeof METHODS)[number];
@@ -214,6 +214,13 @@ export function PolicyFields({
           onChange={set("maxPerDay")}
           error={errors.maxPerDay}
           hint="UTC day."
+          info={
+            <InfoTip label="What counts towards the daily amount">
+              Every call the outside API accepted counts, whether or not it was
+              paid in the end. An abandoned checkout still counts, so set the
+              daily limit with that in mind.
+            </InfoTip>
+          }
         />
       </div>
     </fieldset>
