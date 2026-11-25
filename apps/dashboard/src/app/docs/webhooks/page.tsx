@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Code, Note, Params } from "@/components/docs/code";
 import { NextPage } from "@/components/docs/docs-nav";
 
@@ -15,6 +16,11 @@ export default function WebhooksDocsPage() {
           handling Stripe&apos;s signing secret in your app.
         </p>
       </header>
+      <Note>
+        Webhooks support Stripe only for now. To call other providers, use{" "}
+        <Link href="/docs/connections">connections</Link>, which work with any
+        HTTPS API that takes its key in a header.
+      </Note>
 
       <h2 className="heading-5">How it works</h2>
       <ol>

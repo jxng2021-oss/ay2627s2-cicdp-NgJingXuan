@@ -59,6 +59,13 @@ EC2 → **Launch instance**:
 | Storage                                 | 30 GB gp3                                                                        |
 | IAM instance profile (Advanced details) | `secure-cloud-instance`                                                          |
 
+**Storage limit per workspace:** the server gives each workspace 1 GiB
+(`STORAGE_QUOTA_BYTES`, default `1073741824` in `deploy/docker-compose.yml`),
+so a few full workspaces can't fill the 30 GB disk, which the system, the
+images and the databases share. An upload that would go over the limit gets
+`413 STORAGE_QUOTA_EXCEEDED`. For more space, raise the disk size and the
+limit together; the longer-term option is keeping the encrypted files in S3.
+
 Then EC2 → **Elastic IPs → Allocate** → **Associate** with the instance.
 Note the instance ID (`i-…`).
 

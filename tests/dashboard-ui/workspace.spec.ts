@@ -173,6 +173,9 @@ test("files: upload with progress, a script-like name shown as text, download, d
 
 test("connections: create and remove (confirmed)", async () => {
   await openSection(page, "Connections");
+  await expect(
+    page.getByText(/any outside HTTPS API that takes its key in a header/),
+  ).toBeVisible();
   await page.getByRole("link", { name: "Create connection" }).click();
   await page.waitForURL("**/connections/new");
   await page.getByLabel("Name", { exact: true }).fill("mock");
@@ -209,6 +212,9 @@ test("webhooks: create an endpoint with a Stripe secret, copy its address, delet
 
   await openSection(page, "Webhooks");
   await expect(page.getByText("No webhook endpoints yet.")).toBeVisible();
+  await expect(
+    page.getByText(/Webhooks support Stripe only for now\./),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Create endpoint" }).click();
   const form = page.getByRole("dialog", { name: "Create a webhook endpoint" });
   await form.getByRole("button", { name: "Create endpoint" }).click();

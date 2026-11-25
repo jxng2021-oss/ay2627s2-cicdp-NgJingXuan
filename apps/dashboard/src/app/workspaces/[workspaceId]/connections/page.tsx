@@ -24,7 +24,7 @@ export default function ConnectionsPage() {
       <PageHeader
         label="Workspace"
         title="Connections"
-        description="Call an outside API through the proxy route, with one of your secrets added to each request. A policy limits what apps may do through it."
+        description="Call any outside HTTPS API that takes its key in a header (payments, email, AI and more) through the proxy route, with one of your secrets added to each request. The provider's host must be on the platform's allowed list. A policy limits what apps may do through it."
         actions={
           isOwner && (
             <Link
