@@ -26,9 +26,19 @@ export interface OAuthProfile {
 }
 
 export type OAuthFailure = "failed" | "email_unverified";
+export type OAuthStep = "token" | "profile";
+
+export interface OAuthFailureDetail {
+  step?: OAuthStep;
+  status?: number;
+  providerError?: string;
+}
 
 export class OAuthError extends Error {
-  constructor(readonly reason: OAuthFailure) {
+  constructor(
+    readonly reason: OAuthFailure,
+    readonly detail: OAuthFailureDetail = {},
+  ) {
     super(reason);
   }
 }
@@ -38,6 +48,8 @@ export type HttpFetch = typeof fetch;
 export const OAUTH_PROVIDERS = ["google", "github"] as const;
 export const STATE_TTL_SECONDS = 600;
 const TIMEOUT_MS = 10_000;
+const MAX_ACCESS_TOKEN_LENGTH = 2048;
+const PROVIDER_ERROR = /^[A-Za-z0-9_.-]{1,64}$/;
 
 const ENDPOINTS = {
   google: {
@@ -136,8 +148,22 @@ export function stateMatches(
   );
 }
 
-async function json(response: Response): Promise<unknown> {
-  if (!response.ok) throw new OAuthError("failed");
+function providerErrorOf(body: unknown): string | undefined {
+  const error = (body as { error?: unknown } | null)?.error;
+  return typeof error === "string" && PROVIDER_ERROR.test(error)
+    ? error
+    : undefined;
+}
+
+async function json(response: Response, step: OAuthStep): Promise<unknown> {
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() => undefined);
+    throw new OAuthError("failed", {
+      step,
+      status: response.status,
+      providerError: providerErrorOf(body),
+    });
+  }
   return response.json();
 }
 
@@ -163,20 +189,31 @@ async function exchangeCode(
     grant_type: "authorization_code",
     code_verifier: pkceVerifier(secret, state),
   });
-  const token = (await json(
-    await http(ENDPOINTS[provider].token, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/x-www-form-urlencoded",
-      },
-      body,
-      redirect: "error",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    }),
-  )) as { access_token?: unknown };
-  const accessToken = text(token.access_token);
-  if (!accessToken) throw new OAuthError("failed");
+  const response = await http(ENDPOINTS[provider].token, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body,
+    redirect: "error",
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  const token = (await json(response, "token")) as {
+    access_token?: unknown;
+  };
+  const accessToken = token.access_token;
+  if (
+    typeof accessToken !== "string" ||
+    accessToken.length === 0 ||
+    accessToken.length > MAX_ACCESS_TOKEN_LENGTH
+  ) {
+    throw new OAuthError("failed", {
+      step: "token",
+      status: response.status,
+      providerError: providerErrorOf(token),
+    });
+  }
   return accessToken;
 }
 
@@ -195,6 +232,7 @@ async function getJson(
       redirect: "error",
       signal: AbortSignal.timeout(TIMEOUT_MS),
     }),
+    "profile",
   );
 }
 
@@ -214,8 +252,10 @@ async function googleProfile(
   };
   const subject = text(info.sub);
   const email = text(info.email);
-  if (!subject || !email) throw new OAuthError("failed");
-  if (info.email_verified !== true) throw new OAuthError("email_unverified");
+  if (!subject || !email) throw new OAuthError("failed", { step: "profile" });
+  if (info.email_verified !== true) {
+    throw new OAuthError("email_unverified", { step: "profile" });
+  }
   return { subject, email, name: text(info.name) ?? null };
 }
 
@@ -234,13 +274,13 @@ async function githubProfile(
     accessToken,
   );
   if (typeof user.id !== "number" || !Array.isArray(emails)) {
-    throw new OAuthError("failed");
+    throw new OAuthError("failed", { step: "profile" });
   }
   const primary = (
     emails as { email?: unknown; primary?: unknown; verified?: unknown }[]
   ).find((entry) => entry.primary === true && entry.verified === true);
   const email = text(primary?.email);
-  if (!email) throw new OAuthError("email_unverified");
+  if (!email) throw new OAuthError("email_unverified", { step: "profile" });
   return {
     subject: String(user.id),
     email,

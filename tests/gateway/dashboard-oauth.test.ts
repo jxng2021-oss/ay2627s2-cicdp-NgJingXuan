@@ -33,6 +33,8 @@ interface Call {
 class FakeProvider {
   calls: Call[] = [];
   tokenStatus = 200;
+  accessToken = "provider-access-token";
+  tokenBody: unknown = undefined;
   google = {
     sub: "google-user-1",
     email: "Gina@Example.com",
@@ -69,7 +71,10 @@ class FakeProvider {
         }),
       );
     if (url.endsWith("/token") || url.endsWith("/access_token")) {
-      return json({ access_token: "provider-access-token" }, this.tokenStatus);
+      return json(
+        this.tokenBody ?? { access_token: this.accessToken },
+        this.tokenStatus,
+      );
     }
     if (url === "https://openidconnect.googleapis.com/v1/userinfo") {
       return json(this.google);
@@ -378,6 +383,88 @@ describe("Continue with Google or GitHub", () => {
     expect(oauthError(await signInWith(new Browser(app), "google"))).toBe(
       "failed",
     );
+  });
+
+  it("accepts a realistic Google access token longer than 320 characters", async () => {
+    provider.accessToken = `ya29.${"a0AQSTuEx7".repeat(100)}`;
+    const response = await signInWith(new Browser(app), "google");
+
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe(`${DASHBOARD_ORIGIN}/workspaces`);
+    expect(provider.calls[1]!.authorization).toBe(
+      `Bearer ${provider.accessToken}`,
+    );
+    expect(logs.text()).not.toContain(provider.accessToken);
+  });
+
+  it("refuses an access token over 2048 characters, logged as a token step failure", async () => {
+    provider.accessToken = "t".repeat(2049);
+
+    expect(oauthError(await signInWith(new Browser(app), "google"))).toBe(
+      "failed",
+    );
+    const failure = logs
+      .text()
+      .split("\n")
+      .find((line) => line.includes("sign in with the provider failed"));
+    expect(JSON.parse(failure!)).toMatchObject({
+      provider: "google",
+      reason: "failed",
+      step: "token",
+      status: 200,
+    });
+  });
+
+  it("logs a refused token request with its step, status and error code, never a secret", async () => {
+    provider.tokenStatus = 401;
+    provider.tokenBody = {
+      error: "invalid_client",
+      error_description: "The OAuth client was not found.",
+    };
+    const browser = new Browser(app);
+    const started = await begin(browser, "google");
+    const response = await finish(
+      browser,
+      "google",
+      `code=the-code&state=${started.state}`,
+      started.cookie,
+    );
+
+    expect(oauthError(response)).toBe("failed");
+    const failure = logs
+      .text()
+      .split("\n")
+      .find((line) => line.includes("sign in with the provider failed"));
+    expect(JSON.parse(failure!)).toMatchObject({
+      level: 40,
+      provider: "google",
+      reason: "failed",
+      step: "token",
+      status: 401,
+      providerError: "invalid_client",
+    });
+    const verifier = provider.calls[0]!.body!.get("code_verifier")!;
+    for (const secret of ["google-secret", "the-code", verifier]) {
+      expect(logs.text()).not.toContain(secret);
+    }
+  });
+
+  it("logs an unverified email as a profile step failure, without the email", async () => {
+    provider.google.email_verified = false;
+
+    expect(oauthError(await signInWith(new Browser(app), "google"))).toBe(
+      "email_unverified",
+    );
+    const failure = logs
+      .text()
+      .split("\n")
+      .find((line) => line.includes("sign in with the provider failed"));
+    expect(JSON.parse(failure!)).toMatchObject({
+      provider: "google",
+      reason: "email_unverified",
+      step: "profile",
+    });
+    expect(logs.text().toLowerCase()).not.toContain("gina@example.com");
   });
 
   it("a disabled account can't sign in", async () => {
