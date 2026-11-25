@@ -505,7 +505,7 @@ services:
       SECRETS_URL: http://secrets:3002
       INTERNAL_SERVICE_TOKEN: *internal-service-token
       MAX_UPLOAD_BYTES: *max-upload-bytes
-      STORAGE_QUOTA_BYTES: ${STORAGE_QUOTA_BYTES:-5368709120}
+      STORAGE_QUOTA_BYTES: ${STORAGE_QUOTA_BYTES:-1073741824}
       AUDIT_URL: http://audit:3003
       AUDIT_TOKEN: ${AUDIT_TOKEN_STORAGE:?AUDIT_TOKEN_STORAGE must be set}
       SERVICE_VERSION: *service-version
