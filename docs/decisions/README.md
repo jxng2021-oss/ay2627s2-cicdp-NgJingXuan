@@ -56,3 +56,4 @@ records 0033 onwards were written in this repository.
 | [0038](0038-dashboard-google-github-sign-in.md)         | Continue with Google or GitHub for dashboard accounts                                                 | Accepted   | 2026-11-23 |
 | [0039](0039-demo-shop-pays-with-stripe.md)              | The demo shop pays with Stripe (test mode)                                                            | Accepted   | 2026-11-23 |
 | [0040](0040-payment-webhooks-signed-by-secure-cloud.md) | Payment webhooks, checked by secure-cloud and signed with its own key                                 | Accepted   | 2026-11-24 |
+| [0041](0041-qa-report-on-github-pages.md)               | A QA report built by the pipeline and published on GitHub Pages                                       | Accepted   | 2026-11-25 |

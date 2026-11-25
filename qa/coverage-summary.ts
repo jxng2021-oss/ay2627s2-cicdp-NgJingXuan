@@ -17,7 +17,7 @@ const TYPESCRIPT_PARTS = [
   "sdk",
   "demo-shop",
 ];
-const COVERAGE_DIR = "coverage";
+const COVERAGE_DIR = "qa/coverage";
 
 function readJson<T>(path: string): T | undefined {
   return existsSync(path)
