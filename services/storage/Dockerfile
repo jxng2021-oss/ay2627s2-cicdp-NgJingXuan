@@ -19,7 +19,8 @@ COPY services/secrets/ services/secrets/
 RUN cargo build --release --locked -p storage --bin storage
 
 FROM alpine:3.22
-RUN addgroup -S -g 1000 storage \
+RUN apk upgrade --no-cache \
+ && addgroup -S -g 1000 storage \
  && adduser -S -D -H -u 1000 -G storage storage \
  && mkdir /data \
  && chown storage:storage /data

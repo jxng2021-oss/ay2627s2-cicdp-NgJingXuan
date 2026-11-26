@@ -19,7 +19,8 @@ COPY services/secrets/ services/secrets/
 RUN cargo build --release --locked -p secrets --bin secrets --bin secrets-operator
 
 FROM alpine:3.22
-RUN addgroup -S -g 1000 secrets \
+RUN apk upgrade --no-cache \
+ && addgroup -S -g 1000 secrets \
  && adduser -S -D -H -u 1000 -G secrets secrets
 COPY --from=build /repo/target/release/secrets /usr/local/bin/secrets
 COPY --from=build /repo/target/release/secrets-operator /usr/local/bin/secrets-operator
