@@ -37,7 +37,7 @@
     "test:coverage": "pnpm test:coverage:ts && pnpm test:coverage:rust && node qa/coverage-summary.ts",
     "test:coverage:ts": "pnpm --workspace-concurrency=1 --filter @platform/audit --filter @platform/gateway --filter @platform/flags --filter @platform/identity --filter @platform/dashboard --filter @secure-cloud/sdk test:coverage && pnpm sdk:build && pnpm --filter @platform/demo-shop test:coverage",
     "test:coverage:install": "rustup component add llvm-tools-preview && (cargo llvm-cov --version || cargo install cargo-llvm-cov --locked --version 0.9.1)",
-    "test:coverage:rust": "cargo llvm-cov --locked --no-report -p secrets -p storage && node -e \"require('node:fs').mkdirSync('qa/coverage/rust', { recursive: true })\" && cargo llvm-cov report --json --summary-only --output-path qa/coverage/rust/coverage-summary.json && cargo llvm-cov report --html --output-dir qa/coverage/rust && cargo llvm-cov report --lcov --output-path qa/coverage/rust/lcov.info",
+    "test:coverage:rust": "cargo llvm-cov --locked --no-report -p secrets -p storage && node -e \"require('node:fs').mkdirSync('qa/coverage/rust', { recursive: true })\" && cargo llvm-cov report --json --summary-only --output-path qa/coverage/rust/coverage-summary.json --fail-under-lines 80 && cargo llvm-cov report --html --output-dir qa/coverage/rust && cargo llvm-cov report --lcov --output-path qa/coverage/rust/lcov.info",
     "test:database": "pnpm --filter @platform/tests exec vitest run --root database",
     "test:e2e": "pnpm --filter @platform/e2e test",
     "test:compat": "pnpm test:compat:secrets && pnpm test:compat:storage",
