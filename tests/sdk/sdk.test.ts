@@ -11,6 +11,7 @@ import {
   SecureCloudError,
   errorHandler,
   hasPermission,
+  isSecureCloudError,
 } from "../../packages/sdk/src/index.js";
 import {
   API_KEY,
@@ -868,5 +869,177 @@ describe("webhooks", () => {
       `/v1/webhook-events?after=3&endpointId=${ENDPOINT}`,
     );
     expect(gateway.seen[0]!.headers.authorization).toBe(`Bearer ${API_KEY}`);
+  });
+});
+
+describe("more of the SDK", () => {
+  it("sends a text or byte body as it is, and returns a text answer as text", async () => {
+    const gateway = await fakeGateway((_req, res) => {
+      res.statusCode = 200;
+      res.setHeader("content-type", "text/plain");
+      res.end("plain answer");
+    });
+    const cloud = new SecureCloud({ apiKey: API_KEY, url: gateway.url });
+    const text = await cloud.connections.call("mailer", "POST /send", "hello");
+    await cloud.connections.call(
+      "mailer",
+      "POST /send",
+      new Uint8Array([104, 105]),
+    );
+    expect(text.data).toBe("plain answer");
+    expect(gateway.seen[0]!.body.toString()).toBe("hello");
+    expect(gateway.seen[1]!.body.toString()).toBe("hi");
+  });
+
+  it("uploads a multer file saved on disk and a web stream, and reads usage", async () => {
+    const gateway = await fakeGateway((req, res) =>
+      req.path === "/v1/storage/usage"
+        ? json(res, 200, { usedBytes: 9, reservedBytes: 0, limitBytes: 99 })
+        : json(res, 201, { id: FILE_ID }),
+    );
+    const cloud = new SecureCloud({ apiKey: API_KEY, url: gateway.url });
+    const dir = mkdtempSync(join(tmpdir(), "sdk-"));
+    writeFileSync(join(dir, "upload-1"), "from disk");
+    await cloud.files.upload({
+      originalname: "report.pdf",
+      mimetype: "application/pdf",
+      path: join(dir, "upload-1"),
+    });
+    await cloud.files.upload(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode("web stream"));
+          controller.close();
+        },
+      }),
+      { name: "web.txt", contentType: "text/plain" },
+    );
+    expect(gateway.seen[0]!.body.toString()).toBe("from disk");
+    expect(gateway.seen[0]!.headers["x-file-name"]).toBe("report.pdf");
+    expect(gateway.seen[1]!.body.toString()).toBe("web stream");
+    expect(await cloud.files.usage()).toEqual({
+      usedBytes: 9,
+      reservedBytes: 0,
+      limitBytes: 99,
+    });
+  });
+
+  it("refreshes, signs out, reads a user and changes a password through the pool", async () => {
+    const gateway = await poolGateway();
+    const users = new SecureCloud({
+      apiKey: API_KEY,
+      url: gateway.url,
+    }).userPool(POOL_ID);
+    await users.refresh("r1");
+    await users.signOut("r1");
+    await users.getUser("user-1");
+    await users.changePassword("user-1", {
+      currentPassword: "an old password",
+      newPassword: "a new long password",
+    });
+    expect(gateway.seen.map((r) => `${r.method} ${r.path}`)).toEqual([
+      `POST /v1/user-pools/${POOL_ID}/sessions/refresh`,
+      `POST /v1/user-pools/${POOL_ID}/sessions/revoke`,
+      `GET /v1/user-pools/${POOL_ID}/users/user-1`,
+      `POST /v1/user-pools/${POOL_ID}/users/user-1/password`,
+    ]);
+    expect(JSON.parse(gateway.seen[0]!.body.toString())).toEqual({
+      refreshToken: "r1",
+    });
+  });
+
+  it("refuses tokens that aren't ES256 or have no user", async () => {
+    const gateway = await poolGateway();
+    const users = new SecureCloud({
+      apiKey: API_KEY,
+      url: gateway.url,
+    }).userPool(POOL_ID);
+    const [, payload, signature] = token({}).split(".");
+    const rs256 = `${Buffer.from(JSON.stringify({ alg: "RS256", kid: "key-1" })).toString("base64url")}.${payload}.${signature}`;
+    const garbled = `${Buffer.from("{not json").toString("base64url")}.${payload}.${signature}`;
+    for (const bad of [rs256, garbled, token({ email: undefined })]) {
+      await expect(users.verify(bad)).rejects.toMatchObject({
+        code: "INVALID_TOKEN",
+      });
+    }
+  });
+
+  it("requireUser() passes problems that aren't the user's on to Express", async () => {
+    const gateway = await fakeGateway((_req, res) =>
+      platformError(res, 503, "SERVICE_UNAVAILABLE"),
+    );
+    const users = new SecureCloud({
+      apiKey: API_KEY,
+      url: gateway.url,
+    }).userPool(POOL_ID);
+    const next = vi.fn();
+    await users.requireUser()(
+      { headers: { authorization: `Bearer ${token({})}` } },
+      { status: vi.fn(), json: vi.fn(), setHeader: vi.fn() },
+      next,
+    );
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 503 }));
+  });
+
+  it("reads a token from a cookie, and ignores a broken or missing one", async () => {
+    const gateway = await poolGateway();
+    const users = new SecureCloud({
+      apiKey: API_KEY,
+      url: gateway.url,
+    }).userPool(POOL_ID);
+    const guard = users.requireUser({ cookie: "access_token" });
+    for (const cookie of ["access_token=%E0%A4%A", "theme=dark"]) {
+      const res = { status: vi.fn(), json: vi.fn(), setHeader: vi.fn() };
+      const next = vi.fn();
+      await guard({ headers: { cookie } }, res, next);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(next).not.toHaveBeenCalled();
+    }
+    const parsed = vi.fn();
+    await guard(
+      { headers: {}, cookies: { access_token: token({}) } },
+      { status: vi.fn(), json: vi.fn(), setHeader: vi.fn() },
+      parsed,
+    );
+    expect(parsed).toHaveBeenCalledWith();
+  });
+
+  it("tells the SDK's own errors apart", () => {
+    expect(isSecureCloudError(new SecureCloudError(400, "X", "x"))).toBe(true);
+    expect(isSecureCloudError(new Error("x"))).toBe(false);
+  });
+
+  it("refuses a webhook without a body, or one that isn't an event", async () => {
+    const key = generateKeyPairSync("ec", { namedCurve: "P-256" });
+    const jwk = {
+      ...key.publicKey.export({ format: "jwk" }),
+      kid: "k",
+      alg: "ES256",
+      use: "sig",
+    };
+    const gateway = await fakeGateway((_req, res) =>
+      json(res, 200, { keys: [jwk] }),
+    );
+    const cloud = new SecureCloud({ apiKey: API_KEY, url: gateway.url });
+    const signed = (body: string) => {
+      const t = Math.floor(Date.now() / 1000);
+      const signature = sign("sha256", Buffer.from(`${t}.${body}`), {
+        key: key.privateKey,
+        dsaEncoding: "ieee-p1363",
+      }).toString("base64url");
+      return `t=${t},kid=k,es256=${signature}`;
+    };
+    for (const [body, why] of [
+      ["", /raw body/],
+      ["not json", /isn't JSON/],
+      [
+        JSON.stringify({ id: "x", event: "something.else" }),
+        /isn't a webhook event/,
+      ],
+    ] as const) {
+      await expect(cloud.webhooks.verify(body, signed(body))).rejects.toThrow(
+        why,
+      );
+    }
   });
 });
