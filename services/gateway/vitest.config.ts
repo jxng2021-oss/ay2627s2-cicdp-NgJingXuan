@@ -19,6 +19,7 @@ export default defineConfig({
       exclude: ["src/**/*.d.ts"],
       reporter: ["text-summary", "json-summary", "lcov"],
       reportsDirectory: "../../qa/coverage/gateway",
+      thresholds: { lines: 80 },
     },
     include: ["../../tests/gateway/**/*.test.ts"],
     testTimeout: 30_000,

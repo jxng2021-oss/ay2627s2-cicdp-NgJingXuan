@@ -12,6 +12,7 @@ export default defineConfig({
       exclude: ["src/**/*.d.ts"],
       reporter: ["text-summary", "json-summary", "lcov"],
       reportsDirectory: "../../qa/coverage/sdk",
+      thresholds: { lines: 80 },
     },
   },
 });
