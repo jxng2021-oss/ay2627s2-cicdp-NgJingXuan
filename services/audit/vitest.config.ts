@@ -13,7 +13,7 @@ export default defineConfig({
       exclude: ["src/**/*.d.ts"],
       reporter: ["text-summary", "json-summary", "lcov"],
       reportsDirectory: "../../qa/coverage/audit",
-      thresholds: { lines: 70 },
+      thresholds: { lines: 80 },
     },
     include: ["../../tests/audit/**/*.test.ts"],
     testTimeout: 30_000,

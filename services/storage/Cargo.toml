@@ -32,6 +32,10 @@ path = "../../tests/storage/files.rs"
 name = "contract"
 path = "../../tests/storage/contract.rs"
 
+[[test]]
+name = "clients"
+path = "../../tests/storage/clients.rs"
+
 [dependencies]
 aes-gcm = { version = "=0.10.3", features = ["zeroize"] }
 axum = "=0.8.4"

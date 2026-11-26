@@ -17,9 +17,11 @@ export default defineConfig({
       exclude: ["src/**/*.d.ts"],
       reporter: ["text-summary", "json-summary", "lcov"],
       reportsDirectory: "../../qa/coverage/dashboard",
+      thresholds: { lines: 80 },
     },
     environment: "jsdom",
     include: ["../../tests/dashboard/**/*.test.{ts,tsx}"],
     restoreMocks: true,
+    testTimeout: 30_000,
   },
 });
